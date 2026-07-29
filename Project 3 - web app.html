@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Smart City Fiber Network Planner</title>
+<style>
+  :root{
+    --bg:#0b0f1a;
+    --panel:#131a2a;
+    --panel-2:#182236;
+    --border:#26314a;
+    --accent:#4fd1ff;
+    --accent-2:#ffb454;
+    --text:#e7edf7;
+    --muted:#8492ac;
+    --good:#3ddc97;
+    --bad:#ff6b6b;
+    --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:radial-gradient(1100px 700px at 15% -10%, #14243a 0%, var(--bg) 55%);
+    color:var(--text);
+    min-height:100vh;
+    padding:24px;
+  }
+  .wrap{max-width:1040px;margin:0 auto;}
+  header{
+    text-align:center;
+    padding:28px 20px;
+    background:linear-gradient(135deg, rgba(79,209,255,0.12), rgba(255,180,84,0.10));
+    border:1px solid var(--border);
+    border-radius:16px;
+    margin-bottom:20px;
+  }
+  header h1{
+    margin:0 0 6px 0;
+    font-size:1.5rem;
+    letter-spacing:0.4px;
+    background:linear-gradient(90deg,var(--accent),var(--accent-2));
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+  }
+  header p{margin:0;color:var(--muted);font-size:0.88rem;}
+
+  .tabs{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;}
+  .tab-btn{
+    flex:1;min-width:150px;padding:12px 14px;
+    background:var(--panel);border:1px solid var(--border);border-radius:10px;
+    color:var(--text);cursor:pointer;font-size:0.88rem;font-weight:600;
+    transition:all .15s ease;
+  }
+  .tab-btn:hover{border-color:var(--accent);}
+  .tab-btn.active{background:linear-gradient(135deg,var(--accent),#2fa8cc);color:#04141c;border-color:transparent;}
+
+  .panel{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:20px;display:none;}
+  .panel.active{display:block;}
+
+  .row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;align-items:flex-end;}
+  .field{flex:1;min-width:150px;}
+  label{display:block;font-size:0.78rem;color:var(--muted);margin-bottom:6px;}
+  input[type=number]{
+    width:100%;padding:10px 12px;background:var(--panel-2);
+    border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:0.92rem;
+  }
+  input:focus{outline:none;border-color:var(--accent);}
+
+  button.action{
+    padding:10px 16px;border:none;border-radius:8px;
+    background:linear-gradient(135deg,var(--accent),#2fa8cc);
+    color:#04141c;font-weight:700;cursor:pointer;font-size:0.88rem;
+  }
+  button.action:hover{filter:brightness(1.08);}
+
+  .stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:14px 0;}
+  .stat-card{background:var(--panel-2);border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center;}
+  .stat-card .val{font-size:1.3rem;font-weight:700;color:var(--accent);}
+  .stat-card .lbl{font-size:0.75rem;color:var(--muted);margin-top:4px;}
+
+  .algo-results{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;margin-top:14px;}
+  .algo-card{background:var(--panel-2);border:1px solid var(--border);border-radius:12px;padding:16px;}
+  .algo-card h3{margin:0 0 8px 0;font-size:1rem;color:var(--accent);}
+  .algo-card .metric{font-size:0.82rem;color:var(--muted);margin-bottom:10px;}
+  .algo-card .metric b{color:var(--text);}
+  .route{
+    display:flex;justify-content:space-between;
+    padding:6px 10px;margin-bottom:4px;
+    background:rgba(79,209,255,0.08);
+    border:1px solid rgba(79,209,255,0.25);
+    border-radius:6px;font-size:0.82rem;
+  }
+  .route .cost{color:var(--accent-2);font-weight:600;}
+
+  .verify-banner{
+    margin-top:16px;padding:14px 16px;border-radius:10px;
+    font-size:0.92rem;font-weight:600;
+    display:flex;align-items:center;gap:8px;
+  }
+  .verify-banner.ok{background:rgba(61,220,151,0.12);border:1px solid var(--good);color:var(--good);}
+  .verify-banner.bad{background:rgba(255,107,107,0.12);border:1px solid var(--bad);color:var(--bad);}
+
+  table{width:100%;border-collapse:collapse;margin-top:14px;font-size:0.82rem;}
+  th,td{padding:9px 10px;text-align:right;border-bottom:1px solid var(--border);}
+  th:first-child,td:first-child{text-align:left;}
+  th{color:var(--muted);font-weight:600;}
+  tr:hover td{background:rgba(255,255,255,0.02);}
+
+  .muted{color:var(--muted);font-size:0.85rem;}
+  .config-note{font-size:0.78rem;color:var(--muted);margin-top:8px;}
+  .spinner{
+    display:inline-block;width:14px;height:14px;border-radius:50%;
+    border:2px solid var(--border);border-top-color:var(--accent);
+    animation:spin .7s linear infinite;vertical-align:middle;margin-right:6px;
+  }
+  @keyframes spin{to{transform:rotate(360deg);}}
+
+  .conclusion{
+    background:var(--panel-2);border:1px solid var(--border);border-radius:10px;
+    padding:16px;margin-top:16px;font-size:0.86rem;line-height:1.6;color:var(--muted);
+  }
+  .conclusion strong{color:var(--text);}
+
+  svg{width:100%;height:auto;background:var(--panel-2);border:1px solid var(--border);border-radius:12px;}
+  .legend{display:flex;gap:18px;margin-top:10px;flex-wrap:wrap;font-size:0.8rem;color:var(--muted);}
+  .legend span{display:inline-flex;align-items:center;gap:6px;}
+  .swatch{width:14px;height:4px;border-radius:2px;display:inline-block;}
+
+  footer{text-align:center;color:var(--muted);font-size:0.76rem;margin-top:24px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>🌐 SMART CITY FIBER NETWORK PLANNER</h1>
+    <p>Minimum Spanning Tree via Kruskal's &amp; Prim's Algorithms</p>
+  </header>
+
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="demo">🏙️ Demo Network</button>
+    <button class="tab-btn" data-tab="graph">🕸️ Graph View</button>
+    <button class="tab-btn" data-tab="benchmark">⏱️ Benchmark</button>
+    <button class="tab-btn" data-tab="routes">🛣️ Candidate Routes</button>
+  </div>
+
+  <!-- DEMO PANEL -->
+  <div class="panel active" id="panel-demo">
+    <div class="row">
+      <button class="action" id="btn-run-demo">Run Kruskal &amp; Prim on City Network</button>
+    </div>
+    <div id="demo-summary"></div>
+    <div id="demo-results" class="algo-results"></div>
+    <div id="verify-banner"></div>
+  </div>
+
+  <!-- GRAPH VIEW PANEL -->
+  <div class="panel" id="panel-graph">
+    <p class="muted">The 8-junction demo city network. Selected fiber routes from Kruskal's MST are highlighted; all other candidate routes are shown faded.</p>
+    <div id="graph-svg-container"></div>
+    <div class="legend">
+      <span><span class="swatch" style="background:var(--accent);"></span> MST route (selected)</span>
+      <span><span class="swatch" style="background:#3a4864;"></span> Candidate route (not selected)</span>
+    </div>
+  </div>
+
+  <!-- BENCHMARK PANEL -->
+  <div class="panel" id="panel-benchmark">
+    <p class="muted">Runs Kruskal's vs Prim's on random, connected city-scale graphs of increasing size (edge density 0.15).</p>
+    <div class="row">
+      <button class="action" id="btn-benchmark">Run Benchmark</button>
+    </div>
+    <div id="benchmark-output"></div>
+  </div>
+
+  <!-- ROUTES PANEL -->
+  <div class="panel" id="panel-routes">
+    <p class="muted">All candidate cable routes considered in the demo city network.</p>
+    <div id="routes-list"></div>
+  </div>
+
+  <footer>Ported from the original Python CLI — same algorithms, now in your browser.</footer>
+</div>
+
+<script>
+// ================= Seeded PRNG (mulberry32), mirrors Python random.seed(n) =================
+function mulberry32(seed) {
+  return function() {
+    seed |= 0; seed = (seed + 0x6D2B79F5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function randInt(rngFn, min, max) {
+  return Math.floor(rngFn() * (max - min + 1)) + min;
+}
+function shuffleInPlace(arr, rngFn) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(rngFn() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+}
+
+// ================= Union-Find for Kruskal =================
+class UnionFind {
+  constructor(n) {
+    this.parent = Array.from({length: n}, (_, i) => i);
+    this.rank = new Array(n).fill(0);
+  }
+  find(x) {
+    if (this.parent[x] !== x) this.parent[x] = this.find(this.parent[x]);
+    return this.parent[x];
+  }
+  union(x, y) {
+    let rx = this.find(x), ry = this.find(y);
+    if (rx === ry) return false;
+    if (this.rank[rx] < this.rank[ry]) [rx, ry] = [ry, rx];
+    this.parent[ry] = rx;
+    if (this.rank[rx] === this.rank[ry]) this.rank[rx]++;
+    return true;
+  }
+}
+
+// ================= Kruskal's Algorithm =================
+function kruskal(n, edges) {
+  const sortedEdges = [...edges].sort((a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2]);
+  const uf = new UnionFind(n);
+  const mst = [];
+  let cost = 0;
+  let comparisons = 0;
+  for (const [w, u, v] of sortedEdges) {
+    comparisons++;
+    if (uf.union(u, v)) {
+      mst.push([u, v, w]);
+      cost += w;
+      if (mst.length === n - 1) break;
+    }
+  }
+  return [mst, cost, comparisons];
+}
+
+// ================= Prim's Algorithm (binary min-heap) =================
+class MinHeap {
+  constructor() { this.data = []; }
+  get size() { return this.data.length; }
+  push(item) {
+    this.data.push(item);
+    let i = this.data.length - 1;
+    while (i > 0) {
+      const p = (i - 1) >> 1;
+      if (this.data[p][0] <= this.data[i][0]) break;
+      [this.data[p], this.data[i]] = [this.data[i], this.data[p]];
+      i = p;
+    }
+  }
+  pop() {
+    const top = this.data[0];
+    const last = this.data.pop();
+    if (this.data.length) {
+      this.data[0] = last;
+      let i = 0;
+      const n = this.data.length;
+      while (true) {
+        let l = 2*i+1, r = 2*i+2, smallest = i;
+        if (l < n && this.data[l][0] < this.data[smallest][0]) smallest = l;
+        if (r < n && this.data[r][0] < this.data[smallest][0]) smallest = r;
+        if (smallest === i) break;
+        [this.data[i], this.data[smallest]] = [this.data[smallest], this.data[i]];
+        i = smallest;
+      }
+    }
+    return top;
+  }
+}
+
+function prim(n, adj, start = 0) {
+  if (n <= 0) return [[], 0, 0];
+  if (start < 0 || start >= n) throw new Error("start index is out of range");
+
+  const INF = Infinity;
+  const key = new Array(n).fill(INF);
+  const parent = new Array(n).fill(-1);
+  const inMst = new Array(n).fill(false);
+  key[start] = 0;
+  const pq = new MinHeap();
+  pq.push([0, start]);
+  const mst = [];
+  let cost = 0;
+  let comparisons = 0;
+
+  while (pq.size) {
+    const [w, u] = pq.pop();
+    comparisons++;
+    if (inMst[u]) continue;
+    inMst[u] = true;
+    cost += w;
+    if (parent[u] !== -1) mst.push([parent[u], u, w]);
+
+    for (const [v, weight] of (adj[u] || [])) {
+      comparisons++;
+      if (!inMst[v] && weight < key[v]) {
+        key[v] = weight;
+        parent[v] = u;
+        pq.push([weight, v]);
+      }
+    }
+  }
+
+  return [mst, cost, comparisons];
+}
+
+// ================= Helper: build adjacency list =================
+function buildAdj(n, edges) {
+  const adj = {};
+  for (let i = 0; i < n; i++) adj[i] = [];
+  for (const [w, u, v] of edges) {
+    adj[u].push([v, w]);
+    adj[v].push([u, w]);
+  }
+  return adj;
+}
+
+// ================= City Junction Network (demo dataset) =================
+const JUNCTIONS = ["CityCenter", "TechPark", "Airport", "Hospital", "University",
+                    "MetroStation", "Stadium", "Mall"];
+
+const CITY_ROUTES = [
+  [12, "CityCenter", "TechPark"],
+  [9,  "CityCenter", "Hospital"],
+  [15, "CityCenter", "MetroStation"],
+  [7,  "TechPark", "University"],
+  [10, "TechPark", "MetroStation"],
+  [8,  "Airport", "MetroStation"],
+  [14, "Airport", "Stadium"],
+  [6,  "Hospital", "University"],
+  [11, "Hospital", "Mall"],
+  [13, "University", "Stadium"],
+  [5,  "MetroStation", "Mall"],
+  [9,  "Stadium", "Mall"],
+];
+
+const nameToIdx = Object.fromEntries(JUNCTIONS.map((name, i) => [name, i]));
+const N = JUNCTIONS.length;
+const DEMO_EDGES = CITY_ROUTES.map(([w, u, v]) => [w, nameToIdx[u], nameToIdx[v]]);
+
+// ================= Random graph generator (benchmark) =================
+function generateRandomGraph(n, edgeDensity = 0.3, seed = null) {
+  const rng = seed !== null ? mulberry32(seed) : mulberry32(Date.now() & 0xffffffff);
+  const edges = [];
+  for (let u = 0; u < n; u++) {
+    for (let v = u + 1; v < n; v++) {
+      if (rng() < edgeDensity) {
+        const w = randInt(rng, 1, 100);
+        edges.push([w, u, v]);
+      }
+    }
+  }
+  const nodes = Array.from({length: n}, (_, i) => i);
+  shuffleInPlace(nodes, rng);
+  const existing = new Set(edges.map(([w, a, b]) => `${Math.min(a,b)}_${Math.max(a,b)}`));
+  for (let i = 0; i < n - 1; i++) {
+    const a = nodes[i], b = nodes[i+1];
+    const key = `${Math.min(a,b)}_${Math.max(a,b)}`;
+    if (!existing.has(key)) {
+      edges.push([randInt(rng, 1, 100), a, b]);
+      existing.add(key);
+    }
+  }
+  return edges;
+}
+
+// ================= Rendering helpers =================
+function formatRoute(u, v, w) {
+  return `${JUNCTIONS[u]} &harr; ${JUNCTIONS[v]}`;
+}
+
+function renderDemo() {
+  const summary = document.getElementById('demo-summary');
+  const results = document.getElementById('demo-results');
+  const banner = document.getElementById('verify-banner');
+
+  const [mstK, costK, compK] = kruskal(N, DEMO_EDGES);
+  const adj = buildAdj(N, DEMO_EDGES);
+  const [mstP, costP, compP] = prim(N, adj, 0);
+
+  summary.innerHTML = `
+    <div class="stat-grid">
+      <div class="stat-card"><div class="val">${N}</div><div class="lbl">Junctions</div></div>
+      <div class="stat-card"><div class="val">${DEMO_EDGES.length}</div><div class="lbl">Candidate Routes</div></div>
+      <div class="stat-card"><div class="val">${mstK.length}</div><div class="lbl">Routes in MST</div></div>
+    </div>`;
+
+  function algoCard(title, mst, cost, comps) {
+    let routesHtml = '';
+    for (const [u, v, w] of mst) {
+      routesHtml += `<div class="route"><span>${formatRoute(u, v, w)}</span><span class="cost">Rs.${w} lakhs</span></div>`;
+    }
+    return `
+      <div class="algo-card">
+        <h3>${title}</h3>
+        <div class="metric">Comparisons made: <b>${comps}</b> &nbsp;|&nbsp; Total cost: <b>Rs.${cost} lakhs</b></div>
+        ${routesHtml}
+      </div>`;
+  }
+
+  results.innerHTML =
+    algoCard("Kruskal's Algorithm Result", mstK, costK, compK) +
+    algoCard("Prim's Algorithm Result", mstP, costP, compP);
+
+  if (costK === costP) {
+    banner.innerHTML = `<div class="verify-banner ok">✅ Both algorithms agree! Minimum network cost = Rs.${costK} lakhs</div>`;
+  } else {
+    banner.innerHTML = `<div class="verify-banner bad">❌ Mismatch between algorithms (unexpected).</div>`;
+  }
+
+  renderGraph(mstK);
+  renderRoutes();
+}
+
+function renderGraph(mstEdges) {
+  const container = document.getElementById('graph-svg-container');
+  const width = 760, height = 480;
+  const cx = width / 2, cy = height / 2, radius = 190;
+
+  const positions = JUNCTIONS.map((_, i) => {
+    const angle = (2 * Math.PI * i) / N - Math.PI / 2;
+    return { x: cx + radius * Math.cos(angle), y: cy + radius * Math.sin(angle) };
+  });
+
+  const mstKeySet = new Set(mstEdges.map(([u, v]) => `${Math.min(u,v)}_${Math.max(u,v)}`));
+
+  let edgesSvg = '';
+  for (const [w, u, v] of DEMO_EDGES) {
+    const key = `${Math.min(u,v)}_${Math.max(u,v)}`;
+    const isMst = mstKeySet.has(key);
+    const p1 = positions[u], p2 = positions[v];
+    const midX = (p1.x + p2.x) / 2, midY = (p1.y + p2.y) / 2;
+    edgesSvg += `<line x1="${p1.x}" y1="${p1.y}" x2="${p2.x}" y2="${p2.y}"
+      stroke="${isMst ? 'var(--accent)' : '#3a4864'}"
+      stroke-width="${isMst ? 3 : 1.5}"
+      stroke-dasharray="${isMst ? 'none' : '4,4'}" />`;
+    edgesSvg += `<text x="${midX}" y="${midY}" fill="${isMst ? 'var(--accent-2)' : '#5a6a88'}"
+      font-size="11" font-family="monospace" text-anchor="middle">${w}</text>`;
+  }
+
+  let nodesSvg = '';
+  positions.forEach((p, i) => {
+    nodesSvg += `
+      <circle cx="${p.x}" cy="${p.y}" r="26" fill="#182236" stroke="var(--accent)" stroke-width="2" />
+      <text x="${p.x}" y="${p.y - 34}" fill="#e7edf7" font-size="12" font-family="sans-serif" text-anchor="middle" font-weight="600">${JUNCTIONS[i]}</text>
+    `;
+  });
+
+  container.innerHTML = `
+    <svg viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">
+      ${edgesSvg}
+      ${nodesSvg}
+    </svg>`;
+}
+
+function renderRoutes() {
+  const list = document.getElementById('routes-list');
+  let html = '<table><thead><tr><th>Route</th><th>Cost (Rs. lakhs)</th></tr></thead><tbody>';
+  for (const [w, u, v] of DEMO_EDGES) {
+    html += `<tr><td>${JUNCTIONS[u]} &harr; ${JUNCTIONS[v]}</td><td>${w}</td></tr>`;
+  }
+  html += '</tbody></table>';
+  list.innerHTML = html;
+}
+
+// ================= Tabs =================
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('panel-' + btn.dataset.tab).classList.add('active');
+  });
+});
+
+document.getElementById('btn-run-demo').addEventListener('click', renderDemo);
+
+// ================= Benchmark UI =================
+document.getElementById('btn-benchmark').addEventListener('click', () => {
+  const out = document.getElementById('benchmark-output');
+  out.innerHTML = '<p class="muted"><span class="spinner"></span>Running benchmark across graph sizes...</p>';
+
+  setTimeout(() => {
+    const sizes = [50, 100, 300, 500, 1000];
+    const rows = [];
+
+    for (const n of sizes) {
+      const edges = generateRandomGraph(n, 0.15, 42);
+      const adj = buildAdj(n, edges);
+
+      let start = performance.now();
+      const [, costK, compK] = kruskal(n, edges);
+      const tK = performance.now() - start;
+
+      start = performance.now();
+      const [, costP, compP] = prim(n, adj, 0);
+      const tP = performance.now() - start;
+
+      const match = costK === costP ? "YES" : "NO";
+      rows.push({ n, edges: edges.length, tK, tP, compK, compP, match });
+    }
+
+    let html = `<table>
+      <thead>
+        <tr><th>Nodes</th><th>Edges</th><th>Kruskal (ms)</th><th>Prim (ms)</th><th>K.Comp</th><th>P.Comp</th><th>Cost Match</th></tr>
+      </thead><tbody>`;
+    for (const r of rows) {
+      html += `<tr>
+        <td>${r.n}</td>
+        <td>${r.edges}</td>
+        <td>${r.tK.toFixed(4)}</td>
+        <td>${r.tP.toFixed(4)}</td>
+        <td>${r.compK.toLocaleString()}</td>
+        <td>${r.compP.toLocaleString()}</td>
+        <td style="color:${r.match === 'YES' ? 'var(--good)' : 'var(--bad)'};font-weight:600;">${r.match}</td>
+      </tr>`;
+    }
+    html += `</tbody></table>
+      <div class="conclusion">
+        <strong>Conclusion:</strong> Both algorithms always produce identical minimum costs, confirming
+        correctness. Kruskal's does far fewer "comparisons" in this count because it stops as soon as
+        n&minus;1 edges are accepted, but it still pays an O(E log E) cost to sort all candidate routes
+        upfront. Prim's shows a much higher comparison count (every heap push/pop and neighbour check is
+        counted), yet its wall-clock time can be lower on denser random city graphs because heap operations
+        are cheap compared to sorting tens of thousands of edges. Kruskal's is the more natural choice for
+        genuinely sparse networks (a small, curated list of candidate cable routes, as in the 8-junction
+        demo), while Prim's scales better as the number of candidate routes grows large relative to junctions.
+      </div>`;
+    out.innerHTML = html;
+  }, 30);
+});
+
+// initial load
+renderDemo();
+</script>
+</body>
+</html>

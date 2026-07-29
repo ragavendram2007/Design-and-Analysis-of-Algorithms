@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>City Sensor Network Extreme Reading Finder</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0a0f1a;
+    --panel:#111a2c;
+    --panel-alt:#152238;
+    --border:#22314d;
+    --text:#e7edf7;
+    --muted:#7c8aa8;
+    --accent:#22d3c7;
+    --accent-dim:#12786f;
+    --accent2:#8b7bff;
+    --warn:#f5a623;
+    --danger:#fb6b6b;
+    --mono:'JetBrains Mono', monospace;
+    --sans:'Inter', sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:var(--sans);}
+  body{min-height:100vh;}
+  ::selection{background:var(--accent-dim);color:#fff;}
+
+  .wrap{max-width:1180px;margin:0 auto;padding:38px 28px 70px;}
+
+  .topline{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;margin-bottom:26px;flex-wrap:wrap;}
+  .eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.16em;color:var(--accent);margin-bottom:8px;display:flex;align-items:center;gap:8px;}
+  .eyebrow .dot{width:8px;height:8px;border-radius:50%;background:var(--accent);box-shadow:0 0 10px var(--accent);animation:pulse 2.4s infinite;}
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.35;}}
+  h1{font-family:var(--mono);font-size:26px;margin:0 0 10px;letter-spacing:-.01em;}
+  .scenario{color:var(--muted);font-size:14.5px;max-width:680px;line-height:1.55;}
+
+  .controls{display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
+  .runbtn, .seedbtn{
+    font-family:var(--mono);font-size:12.5px;letter-spacing:.06em;font-weight:600;
+    border:none;border-radius:9px;padding:13px 20px;cursor:pointer;white-space:nowrap;
+    transition:transform .12s, box-shadow .2s;
+  }
+  .runbtn{background:var(--accent);color:#04211f;}
+  .runbtn:hover{transform:translateY(-1px);box-shadow:0 6px 22px rgba(34,211,199,.28);}
+  .seedbtn{background:var(--panel-alt);color:var(--text);border:1px solid var(--border);}
+  .seedbtn:hover{border-color:var(--accent);}
+  .runbtn:disabled{opacity:.5;cursor:progress;}
+
+  .grid{display:grid;grid-template-columns:1.3fr 1fr;gap:20px;align-items:start;margin-top:24px;}
+  @media (max-width:900px){.grid{grid-template-columns:1fr;} .wrap{padding:26px 16px 50px;}}
+
+  .panel{background:var(--panel);border:1px solid var(--border);border-radius:14px;overflow:hidden;}
+  .panel-head{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid var(--border);background:var(--panel-alt);}
+  .panel-head .t{font-family:var(--mono);font-size:11px;letter-spacing:.1em;color:var(--muted);}
+  .panel-head .badge{font-family:var(--mono);font-size:10px;color:var(--accent);}
+
+  pre.console{
+    margin:0;padding:18px;font-family:var(--mono);font-size:12.3px;line-height:1.65;
+    color:#cfe3ff;background:#0b1220;height:520px;overflow-y:auto;white-space:pre-wrap;word-break:break-word;
+  }
+  pre.console .ok{color:var(--accent);}
+  pre.console .warn{color:var(--warn);}
+  pre.console .muted{color:var(--muted);}
+  pre.console .head{color:#8b7bff;}
+
+  .stat-cards{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:14px 16px 4px;}
+  .stat-card{background:var(--panel-alt);border:1px solid var(--border);border-radius:10px;padding:12px 14px;}
+  .stat-card .k{font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:.08em;}
+  .stat-card .v{font-family:var(--mono);font-size:19px;color:var(--text);margin-top:4px;}
+  .stat-card .v.accent{color:var(--accent);}
+  .stat-card .v.warn{color:var(--warn);}
+
+  .metrics{padding:16px;display:flex;flex-direction:column;gap:14px;}
+  .metric-row{display:flex;flex-direction:column;gap:6px;}
+  .metric-row .mtop{display:flex;justify-content:space-between;font-family:var(--mono);font-size:11px;color:var(--muted);}
+  .metric-row .mtop b{color:var(--text);font-size:12px;}
+  .bar-track{height:9px;border-radius:5px;background:#0d1526;overflow:hidden;border:1px solid var(--border);}
+  .bar-fill{height:100%;border-radius:5px;transition:width .5s ease;}
+  .bar-fill.a{background:linear-gradient(90deg,var(--accent-dim),var(--accent));}
+  .bar-fill.b{background:linear-gradient(90deg,#4d3fa3,var(--accent2));}
+
+  .zone-table{padding:0 16px 16px;}
+  table{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:12.5px;}
+  th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--border);}
+  th{color:var(--muted);font-weight:500;font-size:10.5px;letter-spacing:.06em;}
+  td.num{text-align:right;}
+  tr.hazard td{color:var(--warn);}
+  tr.clean td{color:var(--accent);}
+
+  .conclusion{padding:16px;font-size:13px;color:var(--muted);line-height:1.6;border-top:1px solid var(--border);}
+  .conclusion b{color:var(--text);}
+
+  ::-webkit-scrollbar{width:8px;height:8px;}
+  ::-webkit-scrollbar-thumb{background:#223047;border-radius:6px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="topline">
+    <div>
+      <div class="eyebrow"><span class="dot"></span>SMART CITY SENSOR NETWORK · DIVIDE &amp; CONQUER</div>
+      <h1>City Sensor Network Extreme Reading Finder</h1>
+      <div class="scenario">
+        Finds the cleanest and most polluted zones (min/max AQI) across a city's IoT air-quality
+        sensor network using Divide &amp; Conquer, verifies the result against a naive linear scan,
+        and benchmarks comparison-efficiency as the sensor network grows to 100,000 nodes.
+      </div>
+    </div>
+    <div class="controls">
+      <button class="seedbtn" id="reseedBtn">🎲 NEW SENSOR SEED</button>
+      <button class="runbtn" id="runBtn">▶ RUN SIMULATION</button>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="panel">
+      <div class="panel-head"><div class="t">LIVE CONSOLE OUTPUT</div><div class="badge" id="consoleBadge">IDLE</div></div>
+      <pre class="console" id="consoleOut">Press RUN SIMULATION to execute the demo + benchmark.</pre>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><div class="t">KEY METRICS</div><div class="badge" id="metricsBadge"></div></div>
+      <div class="stat-cards" id="statCards"></div>
+      <div class="metrics" id="metricBars"></div>
+      <div class="zone-table" id="zoneTableWrap"></div>
+      <div class="conclusion" id="conclusionBox">Run the simulation to see zone readings, comparison counts, and the takeaway.</div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+/* =====================================================================
+   City Sensor Network Extreme Reading Finder — single-file web app
+   Faithful JS port of the uploaded Python project, including its
+   input validation (empty array guard, index-range guard).
+===================================================================== */
+
+const HAZARD_AQI_THRESHOLD = 200;
+
+/* ---------- seeded PRNG so results are reproducible per "seed" ---------- */
+function makeRng(seed){
+  let s = seed >>> 0 || 1;
+  return function(){
+    s ^= s << 13; s >>>= 0;
+    s ^= s >>> 17;
+    s ^= s << 5; s >>>= 0;
+    return (s >>> 0) / 4294967296;
+  };
+}
+function randInt(rng, min, max){
+  return Math.floor(rng() * (max - min + 1)) + min;
+}
+
+/* ---------- Divide & Conquer Min-Max ---------- */
+let comparisonCount = 0;
+
+function minMaxDC(arr, low, high){
+  if (!arr || arr.length === 0) return [null, null];
+  if (low < 0 || high >= arr.length || low > high){
+    throw new Error("invalid array range");
+  }
+  if (low === high) return [arr[low], arr[low]];
+
+  if (high === low + 1){
+    comparisonCount++;
+    return arr[low] < arr[high] ? [arr[low], arr[high]] : [arr[high], arr[low]];
+  }
+
+  const mid = Math.floor((low + high) / 2);
+  const [lmin, lmax] = minMaxDC(arr, low, mid);
+  const [rmin, rmax] = minMaxDC(arr, mid + 1, high);
+
+  comparisonCount++;
+  const overallMin = lmin < rmin ? lmin : rmin;
+  comparisonCount++;
+  const overallMax = lmax > rmax ? lmax : rmax;
+  return [overallMin, overallMax];
+}
+
+/* ---------- Naive Linear Scan ---------- */
+function minMaxNaive(arr){
+  if (!arr || arr.length === 0) return [null, null, 0];
+  let mn = arr[0], mx = arr[0], comps = 0;
+  for (let i = 1; i < arr.length; i++){
+    const x = arr[i];
+    comps++; if (x < mn) mn = x;
+    comps++; if (x > mx) mx = x;
+  }
+  return [mn, mx, comps];
+}
+
+/* ---------- City Zone Sensor Network (demo dataset) ---------- */
+const ZONES = ["TNagar", "Anna Nagar", "Velachery", "Adyar", "Guindy",
+               "Tambaram", "Perungudi", "Porur", "Egmore", "Mylapore"];
+
+function generateSensorReadings(zones, seed){
+  const rng = makeRng(seed);
+  const readings = zones.map(() => randInt(rng, 40, 180));
+  readings[3] = 245;  // Adyar - hazardous spike (e.g. construction dust)
+  readings[8] = 28;   // Egmore - unusually clean reading
+  return readings;
+}
+
+let currentSeed = 7;
+
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function now(){ return performance.now(); }
+
+function demoSensorNetwork(log){
+  log.push(`<span class="head">CITY SENSOR NETWORK EXTREME READING FINDER (Divide &amp; Conquer)</span>`);
+  const readings = generateSensorReadings(ZONES, currentSeed);
+
+  log.push('');
+  log.push(`Zones monitored: ${ZONES.length}   (seed=${currentSeed})`);
+  log.push(`${'Zone'.padStart(14)} ${'AQI'.padStart(6)}`);
+  log.push('-'.repeat(24));
+  const zoneRows = [];
+  ZONES.forEach((zone, i) => {
+    const aqi = readings[i];
+    const hazard = aqi > HAZARD_AQI_THRESHOLD;
+    const flag = hazard ? '  ⚠️ HAZARD' : '';
+    log.push(`${zone.padStart(14)} ${String(aqi).padStart(6)}${flag}`);
+    zoneRows.push({zone, aqi, hazard});
+  });
+
+  comparisonCount = 0;
+  let t0 = now();
+  const [dcMin, dcMax] = minMaxDC(readings, 0, readings.length - 1);
+  const dcTime = now() - t0;
+  const dcComps = comparisonCount;
+
+  t0 = now();
+  const [naiveMin, naiveMax, naiveComps] = minMaxNaive(readings);
+  const naiveTime = now() - t0;
+
+  log.push('');
+  log.push(`<span class="head">--- Divide & Conquer Result ---</span>`);
+  log.push(`Cleanest zone AQI: ${dcMin} | Most polluted zone AQI: ${dcMax}`);
+  log.push(`Comparisons used: ${dcComps}  (${dcTime.toFixed(4)}ms)`);
+
+  log.push('');
+  log.push(`<span class="head">--- Naive Linear Scan Result ---</span>`);
+  log.push(`Cleanest zone AQI: ${naiveMin} | Most polluted zone AQI: ${naiveMax}`);
+  log.push(`Comparisons used: ${naiveComps}  (${naiveTime.toFixed(4)}ms)`);
+
+  const cleanestZone = ZONES[readings.indexOf(dcMin)];
+  const worstZone = ZONES[readings.indexOf(dcMax)];
+
+  log.push('');
+  log.push(`<span class="head">--- Verification ---</span>`);
+  if (dcMin === naiveMin && dcMax === naiveMax){
+    log.push(`<span class="ok">✅ Both methods agree on the extreme readings!</span>`);
+  } else {
+    log.push(`<span class="warn">❌ Mismatch detected (unexpected).</span>`);
+  }
+
+  log.push('');
+  log.push(`📍 Cleanest zone: ${cleanestZone} (AQI ${dcMin})`);
+  log.push(`📍 Most polluted zone: ${worstZone} (AQI ${dcMax})`);
+  if (dcMax > HAZARD_AQI_THRESHOLD){
+    log.push(`<span class="warn">🚨 ALERT: ${worstZone} has crossed the hazardous AQI threshold (${HAZARD_AQI_THRESHOLD})! Recommend rerouting cyclists/pedestrians away from this zone.</span>`);
+  }
+
+  return { readings, zoneRows, dcMin, dcMax, dcComps, dcTime, naiveMin, naiveMax, naiveComps, naiveTime, cleanestZone, worstZone };
+}
+
+function runBenchmark(log){
+  log.push('');
+  log.push(`<span class="head">PERFORMANCE BENCHMARK: D&amp;C vs Naive comparisons vs theoretical formula</span>`);
+  const sizes = [10, 100, 1000, 10000, 100000];
+  log.push(`${'Sensors'.padStart(10)} ${'D&C Comps'.padStart(12)} ${'Naive Comps'.padStart(14)} ${'Formula 3n/2-2'.padStart(16)} ${'D&C Time(ms)'.padStart(14)} ${'Naive Time(ms)'.padStart(16)}`);
+  log.push('-'.repeat(78));
+
+  const rows = [];
+  sizes.forEach(size => {
+    const rng = makeRng(size);
+    const arr = Array.from({length: size}, () => randInt(rng, 1, 500));
+
+    comparisonCount = 0;
+    let t0 = now();
+    minMaxDC(arr, 0, arr.length - 1);
+    const dcTime = now() - t0;
+    const dcComps = comparisonCount;
+
+    t0 = now();
+    const [, , naiveComps] = minMaxNaive(arr);
+    const naiveTime = now() - t0;
+
+    const formula = Math.floor(3 * size / 2) - 2;
+    rows.push({size, dcComps, naiveComps, formula, dcTime, naiveTime});
+    log.push(`${String(size).padStart(10)} ${String(dcComps).padStart(12)} ${String(naiveComps).padStart(14)} ${String(formula).padStart(16)} ${dcTime.toFixed(4).padStart(14)} ${naiveTime.toFixed(4).padStart(16)}`);
+  });
+
+  return rows;
+}
+
+/* ---------- rendering ---------- */
+function renderZoneTable(zoneRows){
+  const wrap = document.getElementById('zoneTableWrap');
+  let html = '<table><thead><tr><th>Zone</th><th style="text-align:right">AQI</th><th></th></tr></thead><tbody>';
+  zoneRows.forEach(r => {
+    const cls = r.hazard ? 'hazard' : '';
+    const tag = r.hazard ? '⚠ HAZARD' : '';
+    html += `<tr class="${cls}"><td>${esc(r.zone)}</td><td class="num">${r.aqi}</td><td>${tag}</td></tr>`;
+  });
+  html += '</tbody></table>';
+  wrap.innerHTML = html;
+}
+
+function renderStats(demo, lastBenchRow){
+  const cardsEl = document.getElementById('statCards');
+  const stats = [
+    {k:'CLEANEST ZONE', v: demo.cleanestZone},
+    {k:'MOST POLLUTED', v: demo.worstZone, cls:'warn'},
+    {k:'D&C COMPARISONS', v: demo.dcComps, cls:'accent'},
+    {k:'NAIVE COMPARISONS', v: demo.naiveComps},
+  ];
+  cardsEl.innerHTML = '';
+  stats.forEach(st => {
+    const d = document.createElement('div');
+    d.className = 'stat-card';
+    d.innerHTML = `<div class="k">${st.k}</div><div class="v ${st.cls||''}">${st.v}</div>`;
+    cardsEl.appendChild(d);
+  });
+}
+
+function renderBars(lastBenchRow){
+  const barsEl = document.getElementById('metricBars');
+  barsEl.innerHTML = '';
+  const maxComp = lastBenchRow.naiveComps;
+  const bars = [
+    {label:`D&C comparisons @ n=${lastBenchRow.size.toLocaleString()}`, val: lastBenchRow.dcComps, max: maxComp, cls:'a'},
+    {label:`Naive comparisons @ n=${lastBenchRow.size.toLocaleString()}`, val: lastBenchRow.naiveComps, max: maxComp, cls:'b'},
+  ];
+  bars.forEach(b => {
+    const pct = b.max > 0 ? Math.max(2, Math.min(100, (b.val / b.max) * 100)) : 0;
+    const row = document.createElement('div');
+    row.className = 'metric-row';
+    row.innerHTML = `
+      <div class="mtop"><span>${b.label}</span><b>${b.val.toLocaleString()}</b></div>
+      <div class="bar-track"><div class="bar-fill ${b.cls}" style="width:0%"></div></div>
+    `;
+    barsEl.appendChild(row);
+    requestAnimationFrame(() => row.querySelector('.bar-fill').style.width = pct + '%');
+  });
+}
+
+document.getElementById('reseedBtn').addEventListener('click', () => {
+  currentSeed = Math.floor(Math.random() * 100000) + 1;
+  document.getElementById('consoleOut').innerHTML = `New sensor seed set to <b>${currentSeed}</b>. Press RUN SIMULATION to re-scan the network.`;
+  document.getElementById('consoleBadge').textContent = 'IDLE';
+});
+
+document.getElementById('runBtn').addEventListener('click', () => {
+  const btn = document.getElementById('runBtn');
+  btn.disabled = true; btn.textContent = 'RUNNING…';
+  document.getElementById('consoleBadge').textContent = 'RUNNING';
+
+  setTimeout(() => {
+    const log = [];
+    const demo = demoSensorNetwork(log);
+    const benchRows = runBenchmark(log);
+
+    log.push('');
+    log.push(`<span class="head">CONCLUSION</span>`);
+    log.push('The Divide & Conquer approach correctly identified both the cleanest');
+    log.push("and most polluted zones, matching the naive scan's answer exactly, while");
+    log.push("using noticeably fewer comparisons than naive's 2(n-1) at every size -");
+    log.push('staying close to (though not always exactly at) the theoretical 3n/2-2');
+    log.push('bound, since the exact count depends on how the array happens to split');
+    log.push('at each recursion level. In an always-on smart-city dashboard polling');
+    log.push('thousands of sensors continuously, that reduction adds up to meaningful');
+    log.push('savings in processing cost at scale - and the same min-max scan pattern');
+    log.push("could equally track traffic density or road-safety risk scores across");
+    log.push("zones for a live city risk dashboard.");
+
+    document.getElementById('consoleOut').innerHTML = log.join('\n');
+    document.getElementById('consoleOut').scrollTop = 0;
+    document.getElementById('consoleBadge').textContent = 'DONE';
+
+    renderZoneTable(demo.zoneRows);
+    renderStats(demo);
+    renderBars(benchRows[benchRows.length - 1]);
+
+    document.getElementById('conclusionBox').innerHTML =
+      `D&amp;C finds the same min/max as the naive scan using noticeably <b>fewer comparisons</b> ` +
+      `(close to the theoretical <b>3n/2 − 2</b> bound vs naive's <b>2(n−1)</b>) — meaningful savings ` +
+      `when continuously polling a large live sensor network. Cleanest zone: <b>${demo.cleanestZone}</b> ` +
+      `(AQI ${demo.dcMin}), most polluted: <b>${demo.worstZone}</b> (AQI ${demo.dcMax}).`;
+
+    btn.disabled = false; btn.textContent = '▶ RUN SIMULATION';
+  }, 150);
+});
+</script>
+</body>
+</html>
