@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SIGNAL — Traffic-Camera Pipeline Optimizer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0a0e16;
+    --panel:#111826;
+    --panel-alt:#161f30;
+    --border:#233047;
+    --text:#e7ecf5;
+    --muted:#7c8aa5;
+    --amber:#ffb020;
+    --amber-dim:#8a6a2a;
+    --cyan:#35d6ff;
+    --cyan-dim:#1d5566;
+    --danger:#ff5c5c;
+    --success:#4ade80;
+    --mono: 'IBM Plex Mono', monospace;
+    --sans: 'IBM Plex Sans', sans-serif;
+    --disp: 'Space Grotesk', sans-serif;
+  }
+  *{box-sizing:border-box;}
+  @media (prefers-reduced-motion: reduce){
+    *{animation-duration:0.001ms !important; transition-duration:0.001ms !important;}
+  }
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:var(--sans);}
+  body{
+    background-image:
+      radial-gradient(circle at 15% 0%, rgba(53,214,255,0.06), transparent 40%),
+      radial-gradient(circle at 85% 10%, rgba(255,176,32,0.05), transparent 40%);
+    padding-bottom:60px;
+  }
+  a{color:var(--cyan);}
+  .wrap{max-width:1080px;margin:0 auto;padding:0 24px;}
+
+  /* ---------- HUD top bar ---------- */
+  .hud-bar{
+    display:flex;align-items:center;gap:10px;
+    font-family:var(--mono);font-size:12px;letter-spacing:0.08em;color:var(--muted);
+    padding:14px 24px;border-bottom:1px solid var(--border);
+  }
+  .rec-dot{width:8px;height:8px;border-radius:50%;background:var(--danger);
+    box-shadow:0 0 8px var(--danger); animation:blink 1.6s ease-in-out infinite;}
+  @keyframes blink{0%,100%{opacity:1;}50%{opacity:0.25;}}
+  .hud-bar .sep{opacity:0.35;}
+
+  /* ---------- Hero ---------- */
+  header.hero{padding:56px 0 36px;}
+  .eyebrow{font-family:var(--mono);font-size:12px;color:var(--cyan);letter-spacing:0.18em;text-transform:uppercase;margin:0 0 14px;}
+  h1{
+    font-family:var(--disp);font-weight:700;font-size:clamp(32px,5vw,54px);
+    line-height:1.05;margin:0 0 18px;letter-spacing:-0.01em;
+  }
+  h1 span{color:var(--amber);}
+  .lede{font-size:16px;line-height:1.65;color:var(--muted);max-width:680px;margin:0;}
+
+  /* ---------- Panels ---------- */
+  section.panel{
+    background:linear-gradient(180deg,var(--panel),var(--panel-alt));
+    border:1px solid var(--border);border-radius:10px;
+    padding:28px;margin-top:24px;
+  }
+  .panel h2{
+    font-family:var(--disp);font-size:20px;margin:0 0 6px;font-weight:600;
+    display:flex;align-items:center;gap:10px;
+  }
+  .panel h2 .tag{
+    font-family:var(--mono);font-size:11px;color:var(--bg);background:var(--cyan);
+    padding:2px 8px;border-radius:4px;letter-spacing:0.06em;font-weight:600;
+  }
+  .panel p.desc{color:var(--muted);font-size:13.5px;margin:0 0 20px;line-height:1.55;}
+
+  /* ---------- Pipeline builder form ---------- */
+  .field-row{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:18px;}
+  .field{flex:1;min-width:240px;}
+  .field label{display:block;font-family:var(--mono);font-size:11px;color:var(--muted);
+    letter-spacing:0.06em;text-transform:uppercase;margin-bottom:6px;}
+  .field input{
+    width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);
+    font-family:var(--mono);font-size:13.5px;padding:10px 12px;border-radius:6px;
+  }
+  .field input:focus{outline:2px solid var(--cyan);outline-offset:1px;border-color:var(--cyan);}
+  .field .hint{font-size:11px;color:var(--muted);margin-top:5px;}
+
+  .btn{
+    font-family:var(--mono);font-size:13px;letter-spacing:0.04em;font-weight:600;
+    background:var(--amber);color:#1a1200;border:none;border-radius:6px;
+    padding:11px 20px;cursor:pointer;transition:transform .12s ease, box-shadow .12s ease;
+  }
+  .btn:hover{box-shadow:0 0 0 3px rgba(255,176,32,0.2);}
+  .btn:active{transform:translateY(1px);}
+  .btn.secondary{background:transparent;border:1px solid var(--cyan);color:var(--cyan);}
+  .btn.secondary:hover{box-shadow:0 0 0 3px rgba(53,214,255,0.15);}
+  .btn:focus-visible{outline:2px solid var(--cyan);outline-offset:2px;}
+  .btn-row{display:flex;gap:12px;flex-wrap:wrap;}
+
+  .error-msg{color:var(--danger);font-family:var(--mono);font-size:12.5px;margin-top:10px;display:none;}
+  .error-msg.show{display:block;}
+
+  /* ---------- Conveyor / node flow ---------- */
+  .flow-scroll{overflow-x:auto;padding:12px 2px 6px;}
+  .flow{display:flex;align-items:center;min-width:max-content;}
+  .node{
+    font-family:var(--mono);font-size:12px;text-align:center;
+    background:var(--bg);border:1px solid var(--border);border-radius:8px;
+    padding:10px 14px;min-width:96px;position:relative;
+  }
+  .node .nname{color:var(--text);font-weight:600;font-size:13px;display:block;margin-bottom:2px;}
+  .node .ndim{color:var(--cyan);font-size:11px;}
+  .edge{
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    width:70px;position:relative;
+  }
+  .edge .arrow{width:100%;height:2px;background:linear-gradient(90deg,var(--amber-dim),var(--amber));position:relative;}
+  .edge .arrow::after{
+    content:"";position:absolute;right:-1px;top:-4px;
+    border-left:8px solid var(--amber);border-top:5px solid transparent;border-bottom:5px solid transparent;
+  }
+  .edge .mlabel{font-family:var(--mono);font-size:10.5px;color:var(--muted);margin-top:6px;}
+  .edge.animate .arrow{ animation:flowpulse 2.4s linear infinite; background-size:200% 100%;
+    background-image:linear-gradient(90deg,var(--amber-dim) 0%,var(--amber) 20%,var(--amber-dim) 40%,var(--amber-dim) 100%);}
+  @keyframes flowpulse{0%{background-position:200% 0;}100%{background-position:-200% 0;}}
+
+  /* ---------- Arc diagram (signature element) ---------- */
+  .arc-wrap{margin-top:22px;background:var(--bg);border:1px solid var(--border);border-radius:8px;
+    padding:16px 8px 8px;position:relative;overflow-x:auto;}
+  .arc-wrap svg{display:block;}
+  .arc-caption{font-family:var(--mono);font-size:11px;color:var(--muted);padding:6px 12px 2px;}
+
+  /* ---------- Result readout ---------- */
+  .readout-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin-top:20px;}
+  .stat{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:16px;}
+  .stat .k{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:0.06em;text-transform:uppercase;margin-bottom:8px;}
+  .stat .v{font-family:var(--mono);font-size:19px;color:var(--amber);font-weight:600;word-break:break-word;}
+  .stat .v.cyan{color:var(--cyan);}
+  .stat .v.small{font-size:14px;color:var(--text);font-weight:400;}
+
+  /* ---------- DP matrix monitor table ---------- */
+  .monitor{
+    position:relative;border:1px solid var(--border);border-radius:8px;overflow:hidden;
+    background:#060a10;margin-top:20px;
+  }
+  .monitor::before{
+    content:"";position:absolute;inset:0;pointer-events:none;
+    background:repeating-linear-gradient(180deg, rgba(255,255,255,0.025) 0px, rgba(255,255,255,0.025) 1px, transparent 1px, transparent 3px);
+    mix-blend-mode:overlay;
+  }
+  .monitor-bar{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--border);
+    font-family:var(--mono);font-size:10.5px;color:var(--muted);letter-spacing:0.08em;}
+  .monitor-bar .dot{width:6px;height:6px;border-radius:50%;background:var(--success);}
+  table.mtable{border-collapse:collapse;width:100%;font-family:var(--mono);font-size:12.5px;}
+  table.mtable th, table.mtable td{padding:8px 10px;text-align:center;border:1px solid rgba(35,48,71,0.6);}
+  table.mtable th{color:var(--cyan);background:rgba(53,214,255,0.05);font-weight:600;}
+  table.mtable td{color:var(--text);}
+  table.mtable td.dash{color:var(--muted);opacity:0.4;}
+  table.mtable .scrollx{overflow-x:auto;}
+  .table-scroll{overflow-x:auto;padding:4px;}
+
+  /* ---------- Brute force verification ---------- */
+  .verify-line{display:flex;align-items:center;gap:10px;font-family:var(--mono);font-size:13px;margin-top:14px;}
+  .badge{padding:3px 10px;border-radius:999px;font-size:11px;letter-spacing:0.04em;font-weight:600;}
+  .badge.ok{background:rgba(74,222,128,0.15);color:var(--success);border:1px solid rgba(74,222,128,0.4);}
+  .badge.skip{background:rgba(124,138,165,0.15);color:var(--muted);border:1px solid var(--border);}
+  .badge.bad{background:rgba(255,92,92,0.15);color:var(--danger);border:1px solid rgba(255,92,92,0.4);}
+
+  /* ---------- Benchmark ---------- */
+  .bench-table{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:12.5px;margin-top:16px;}
+  .bench-table th,.bench-table td{padding:9px 10px;border-bottom:1px solid var(--border);text-align:right;}
+  .bench-table th:first-child, .bench-table td:first-child{text-align:left;}
+  .bench-table th{color:var(--muted);font-weight:500;letter-spacing:0.04em;text-transform:uppercase;font-size:10.5px;}
+  .bar-row{display:flex;align-items:center;gap:8px;height:18px;}
+  .bar{height:8px;border-radius:2px;}
+  .bar.dp{background:var(--cyan);}
+  .bar.bf{background:var(--amber);}
+  .legend{display:flex;gap:18px;font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:10px;}
+  .legend span{display:flex;align-items:center;gap:6px;}
+  .legend .sw{width:10px;height:10px;border-radius:2px;}
+
+  footer{margin-top:40px;padding-top:20px;border-top:1px solid var(--border);
+    font-family:var(--mono);font-size:11.5px;color:var(--muted);text-align:center;}
+
+  ::-webkit-scrollbar{height:8px;width:8px;}
+  ::-webkit-scrollbar-track{background:var(--bg);}
+  ::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px;}
+</style>
+</head>
+<body>
+
+<div class="hud-bar">
+  <div class="rec-dot"></div>
+  <span>REC</span><span class="sep">/</span>
+  <span id="clock">--:--:--</span><span class="sep">/</span>
+  <span>CAM-NET // FRAME PIPELINE ANALYSIS</span>
+</div>
+
+<div class="wrap">
+  <header class="hero">
+    <p class="eyebrow">Smart Traffic-Camera Vision Ops</p>
+    <h1>Find the cheapest order to <span>chain your matrices</span>.</h1>
+    <p class="lede">Every camera frame runs through a fixed sequence of transforms — perspective fix,
+      rotation, scaling, color conversion — each one a matrix multiply. The order you <em>group</em> those
+      multiplies in doesn't change the result, but it changes the scalar-multiplication bill by orders of
+      magnitude. This tool runs the classic Matrix Chain Multiplication DP against true brute-force
+      enumeration, live, on whatever pipeline you build below.</p>
+  </header>
+
+  <!-- ============ PIPELINE BUILDER ============ -->
+  <section class="panel">
+    <h2><span class="tag">01</span>Build the transform chain</h2>
+    <p class="desc">Name each stage the frame passes through, and give the matrix dimension at each stage
+      (one more dimension than stages, since a dimension sits at every boundary). Defaults match the
+      reference pipeline: raw frame → perspective fix → rotation → scaling → color convert.</p>
+
+    <div class="field-row">
+      <div class="field">
+        <label for="stageNames">Stage names (comma-separated)</label>
+        <input id="stageNames" type="text" value="RawFrame, PerspectiveFix, Rotation, Scaling, ColorConvert">
+        <div class="hint">One name per dimension boundary.</div>
+      </div>
+      <div class="field">
+        <label for="stageDims">Dimensions (comma-separated)</label>
+        <input id="stageDims" type="text" value="10, 30, 5, 60, 10">
+        <div class="hint">Must have the same count as stage names.</div>
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn" id="analyzeBtn">Analyze pipeline</button>
+      <button class="btn secondary" id="resetBtn">Reset to default</button>
+    </div>
+    <div class="error-msg" id="errorMsg"></div>
+  </section>
+
+  <!-- ============ FLOW + RESULTS ============ -->
+  <section class="panel" id="resultsPanel" style="display:none;">
+    <h2><span class="tag">02</span>Frame flow &amp; optimal grouping</h2>
+    <p class="desc">Each arrow is one matrix multiply. The arcs below trace which multiplies the optimizer
+      groups together first — taller arcs resolve last, so the diagram reads like a signal trace of the
+      computation order itself.</p>
+
+    <div class="flow-scroll">
+      <div class="flow" id="flowContainer"></div>
+    </div>
+
+    <div class="arc-wrap">
+      <div class="arc-caption">Computation order — nested arcs show grouping depth</div>
+      <div id="arcContainer"></div>
+    </div>
+
+    <div class="readout-grid">
+      <div class="stat">
+        <div class="k">Minimum scalar multiplications</div>
+        <div class="v" id="minCost">—</div>
+      </div>
+      <div class="stat">
+        <div class="k">Optimal grouping order</div>
+        <div class="v small cyan" id="optOrder">—</div>
+      </div>
+      <div class="stat">
+        <div class="k">Chain length</div>
+        <div class="v" id="chainLen">—</div>
+      </div>
+    </div>
+
+    <div class="monitor">
+      <div class="monitor-bar"><span class="dot"></span>DP COST TABLE m[i][j] — SCALAR MULTIPLICATIONS</div>
+      <div class="table-scroll">
+        <table class="mtable" id="dpTable"></table>
+      </div>
+    </div>
+
+    <div class="verify-line">
+      <span>Brute-force verification:</span>
+      <span class="badge" id="verifyBadge">—</span>
+      <span id="verifyDetail" style="color:var(--muted);font-family:var(--mono);font-size:12px;"></span>
+    </div>
+  </section>
+
+  <!-- ============ BENCHMARK ============ -->
+  <section class="panel">
+    <h2><span class="tag">03</span>Why it matters at scale</h2>
+    <p class="desc">Same experiment as the reference script: as the chain grows, brute-force enumeration
+      of every parenthesization explodes combinatorially (the Catalan numbers), while the DP cost table
+      grows gracefully at O(n³). Random dimension sets are generated with a seeded PRNG so results are
+      reproducible per chain length. Brute force is skipped past 11 stages to keep the browser responsive.</p>
+
+    <div class="btn-row">
+      <button class="btn" id="benchBtn">Run benchmark</button>
+    </div>
+
+    <table class="bench-table" id="benchTable" style="display:none;">
+      <thead>
+        <tr><th>Stages (n)</th><th>DP time (ms)</th><th>Brute-force time (ms)</th><th>#Parenthesizations</th><th>Relative time</th></tr>
+      </thead>
+      <tbody id="benchBody"></tbody>
+    </table>
+    <div class="legend" id="benchLegend" style="display:none;">
+      <span><span class="sw" style="background:var(--cyan);"></span>DP</span>
+      <span><span class="sw" style="background:var(--amber);"></span>Brute force</span>
+    </div>
+  </section>
+
+  <footer>
+    SIGNAL — Matrix Chain Multiplication demo, ported from a Python reference pipeline optimizer.
+    All computation runs client-side in your browser.
+  </footer>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  // ---------------- Clock ----------------
+  function tickClock(){
+    document.getElementById('clock').textContent = new Date().toTimeString().slice(0,8);
+  }
+  tickClock(); setInterval(tickClock, 1000);
+
+  // ================= Core DP algorithm =================
+  function matrixChainOrder(dims){
+    const n = dims.length - 1;
+    const m = Array.from({length:n+1}, () => new Array(n+1).fill(0));
+    const s = Array.from({length:n+1}, () => new Array(n+1).fill(0));
+    for(let length=2; length<=n; length++){
+      for(let i=1; i<=n-length+1; i++){
+        const j = i + length - 1;
+        m[i][j] = Infinity;
+        for(let k=i; k<j; k++){
+          const cost = m[i][k] + m[k+1][j] + dims[i-1]*dims[k]*dims[j];
+          if(cost < m[i][j]){
+            m[i][j] = cost;
+            s[i][j] = k;
+          }
+        }
+      }
+    }
+    return {m, s};
+  }
+
+  function buildTree(s, i, j){
+    if(i === j) return {leaf:i};
+    const k = s[i][j];
+    return {i, j, k, left:buildTree(s,i,k), right:buildTree(s,k+1,j)};
+  }
+
+  function printOptimalParens(tree, labels){
+    if(tree.leaf !== undefined) return labels[tree.leaf-1];
+    const left = printOptimalParens(tree.left, labels);
+    const right = printOptimalParens(tree.right, labels);
+    return `(${left} x ${right})`;
+  }
+
+  // TRUE brute force — every distinct parenthesization, no memoization
+  function bruteForceFullEnumeration(dims){
+    const n = dims.length - 1;
+    function allCosts(i, j){
+      if(i === j) return [0];
+      let costs = [];
+      for(let k=i; k<j; k++){
+        const lc = allCosts(i,k);
+        const rc = allCosts(k+1,j);
+        for(const l of lc){
+          for(const r of rc){
+            costs.push(l + r + dims[i-1]*dims[k]*dims[j]);
+          }
+        }
+      }
+      return costs;
+    }
+    const costs = allCosts(1, n);
+    return {min: Math.min(...costs), count: costs.length};
+  }
+
+  // seeded PRNG (mulberry32) so benchmark is reproducible per n
+  function mulberry32(seed){
+    return function(){
+      seed |= 0; seed = (seed + 0x6D2B79F5) | 0;
+      let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  function seededRandDims(n, seed, lo, hi){
+    const rand = mulberry32(seed);
+    const out = [];
+    for(let i=0;i<=n;i++) out.push(lo + Math.floor(rand()*(hi-lo+1)));
+    return out;
+  }
+
+  // ================= UI wiring =================
+  const stageNamesInput = document.getElementById('stageNames');
+  const stageDimsInput = document.getElementById('stageDims');
+  const errorMsg = document.getElementById('errorMsg');
+  const resultsPanel = document.getElementById('resultsPanel');
+
+  function showError(msg){
+    errorMsg.textContent = msg;
+    errorMsg.classList.add('show');
+    resultsPanel.style.display = 'none';
+  }
+  function clearError(){
+    errorMsg.classList.remove('show');
+    errorMsg.textContent = '';
+  }
+
+  function parseInputs(){
+    const names = stageNamesInput.value.split(',').map(s => s.trim()).filter(s => s.length);
+    const dims = stageDimsInput.value.split(',').map(s => Number(s.trim()));
+    if(names.length < 2) throw new Error('Need at least 2 stage names (so there is at least 1 matrix multiply).');
+    if(dims.length !== names.length) throw new Error(`Stage names (${names.length}) and dimensions (${dims.length}) must be the same count.`);
+    if(dims.some(d => !Number.isFinite(d) || d <= 0 || !Number.isInteger(d))) throw new Error('All dimensions must be positive whole numbers.');
+    if(names.length > 22) throw new Error('Keep it to 22 stages or fewer for a readable diagram.');
+    return {names, dims};
+  }
+
+  function renderFlow(names, dims){
+    const flow = document.getElementById('flowContainer');
+    flow.innerHTML = '';
+    names.forEach((name, idx) => {
+      const node = document.createElement('div');
+      node.className = 'node';
+      node.innerHTML = `<span class="nname">${escapeHtml(name)}</span><span class="ndim">dim ${dims[idx]}</span>`;
+      flow.appendChild(node);
+      if(idx < names.length - 1){
+        const edge = document.createElement('div');
+        edge.className = 'edge animate';
+        edge.innerHTML = `<div class="arrow"></div><div class="mlabel">M${idx+1} [${dims[idx]}×${dims[idx+1]}]</div>`;
+        flow.appendChild(edge);
+      }
+    });
+  }
+
+  function escapeHtml(str){
+    const d = document.createElement('div');
+    d.textContent = str;
+    return d.innerHTML;
+  }
+
+  // ---- Arc diagram: recursively lay out leaves, draw an arc per internal node ----
+  function renderArcDiagram(tree, n, containerEl){
+    const spacing = 64;
+    const marginX = 40;
+    const width = marginX*2 + spacing*(n-1);
+    const baseline = 130;
+    const maxHeight = 100;
+
+    // find max span (n-1) to normalize arc height
+    function leavesOf(node){
+      if(node.leaf !== undefined) return [node.leaf];
+      return leavesOf(node.left).concat(leavesOf(node.right));
+    }
+
+    let svgParts = [];
+    function walk(node, depth){
+      if(node.leaf !== undefined) return;
+      const leaves = leavesOf(node);
+      const lo = Math.min(...leaves), hi = Math.max(...leaves);
+      const x1 = marginX + (lo-1)*spacing;
+      const x2 = marginX + (hi-1)*spacing;
+      const span = hi - lo;
+      const h = Math.max(18, (span / Math.max(1,n-1)) * maxHeight);
+      const midX = (x1+x2)/2;
+      const hue = 190 - Math.min(depth,6) * 22; // cyan -> amber-ish shift with depth
+      const colorList = ['#35d6ff','#4bd6d0','#7fd6a0','#b3d670','#ffb020','#ff8a3d','#ff5c5c'];
+      const color = colorList[Math.min(depth, colorList.length-1)];
+      svgParts.push(
+        `<path d="M ${x1} ${baseline} C ${x1} ${baseline-h}, ${x2} ${baseline-h}, ${x2} ${baseline}"
+          fill="none" stroke="${color}" stroke-width="2" opacity="0.85" />`
+      );
+      walk(node.left, depth+1);
+      walk(node.right, depth+1);
+    }
+    walk(tree, 0);
+
+    // leaf tick marks + labels
+    let ticks = '';
+    for(let i=1;i<=n;i++){
+      const x = marginX + (i-1)*spacing;
+      ticks += `<circle cx="${x}" cy="${baseline}" r="3.5" fill="#7c8aa5" />`;
+      ticks += `<text x="${x}" y="${baseline+20}" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="11" fill="#7c8aa5">M${i}</text>`;
+    }
+
+    const svg = `<svg viewBox="0 0 ${width} ${baseline+34}" width="${width}" height="${baseline+34}" xmlns="http://www.w3.org/2000/svg">
+      ${svgParts.join('')}
+      ${ticks}
+    </svg>`;
+    containerEl.innerHTML = svg;
+  }
+
+  function renderDpTable(m, n, names){
+    const table = document.getElementById('dpTable');
+    let html = '<tr><th></th>';
+    for(let j=1;j<=n;j++) html += `<th>M${j}</th>`;
+    html += '</tr>';
+    for(let i=1;i<=n;i++){
+      html += `<tr><th>M${i}</th>`;
+      for(let j=1;j<=n;j++){
+        if(j < i) html += '<td class="dash">·</td>';
+        else html += `<td>${m[i][j]}</td>`;
+      }
+      html += '</tr>';
+    }
+    table.innerHTML = html;
+  }
+
+  function runAnalysis(){
+    clearError();
+    let names, dims;
+    try{
+      ({names, dims} = parseInputs());
+    }catch(e){
+      showError(e.message);
+      return;
+    }
+
+    const n = dims.length - 1;
+    const labels = [];
+    for(let i=1;i<=n;i++) labels.push(`M${i}`);
+
+    const {m, s} = matrixChainOrder(dims);
+    const minCost = m[1][n];
+    const tree = buildTree(s, 1, n);
+    const optOrder = printOptimalParens(tree, labels);
+
+    document.getElementById('minCost').textContent = minCost.toLocaleString();
+    document.getElementById('optOrder').textContent = optOrder;
+    document.getElementById('chainLen').textContent = `${n} matrix multiplies / ${names.length} stages`;
+
+    renderFlow(names, dims);
+    renderArcDiagram(tree, n, document.getElementById('arcContainer'));
+    renderDpTable(m, n, names);
+
+    const verifyBadge = document.getElementById('verifyBadge');
+    const verifyDetail = document.getElementById('verifyDetail');
+    if(n <= 11){
+      const {min: bfMin, count} = bruteForceFullEnumeration(dims);
+      if(bfMin === minCost){
+        verifyBadge.className = 'badge ok';
+        verifyBadge.textContent = 'MATCH';
+      }else{
+        verifyBadge.className = 'badge bad';
+        verifyBadge.textContent = 'MISMATCH';
+      }
+      verifyDetail.textContent = `Brute-force checked all ${count.toLocaleString()} distinct parenthesizations — minimum found: ${bfMin.toLocaleString()}.`;
+    }else{
+      verifyBadge.className = 'badge skip';
+      verifyBadge.textContent = 'SKIPPED';
+      verifyDetail.textContent = `Chain has ${n} matrix multiplies — brute-force enumeration is skipped past 11 to avoid freezing the browser tab. DP result above is still exact.`;
+    }
+
+    resultsPanel.style.display = 'block';
+  }
+
+  document.getElementById('analyzeBtn').addEventListener('click', runAnalysis);
+  document.getElementById('resetBtn').addEventListener('click', () => {
+    stageNamesInput.value = 'RawFrame, PerspectiveFix, Rotation, Scaling, ColorConvert';
+    stageDimsInput.value = '10, 30, 5, 60, 10';
+    clearError();
+    runAnalysis();
+  });
+
+  // ================= Benchmark =================
+  document.getElementById('benchBtn').addEventListener('click', () => {
+    const ns = [3,5,7,9,11];
+    const rows = [];
+    let maxTime = 0;
+    ns.forEach(n => {
+      const dims = seededRandDims(n, n*7919+13, 5, 50);
+
+      const t0 = performance.now();
+      matrixChainOrder(dims);
+      const dpTime = performance.now() - t0;
+
+      const t1 = performance.now();
+      const {count} = bruteForceFullEnumeration(dims);
+      const bfTime = performance.now() - t1;
+
+      maxTime = Math.max(maxTime, dpTime, bfTime);
+      rows.push({n, dpTime, bfTime, count});
+    });
+
+    const body = document.getElementById('benchBody');
+    body.innerHTML = '';
+    rows.forEach(r => {
+      const tr = document.createElement('tr');
+      const dpPct = maxTime > 0 ? Math.max(2, (r.dpTime / maxTime) * 100) : 2;
+      const bfPct = maxTime > 0 ? Math.max(2, (r.bfTime / maxTime) * 100) : 2;
+      tr.innerHTML = `
+        <td>${r.n}</td>
+        <td>${r.dpTime.toFixed(4)}</td>
+        <td>${r.bfTime.toFixed(4)}</td>
+        <td>${r.count.toLocaleString()}</td>
+        <td>
+          <div class="bar-row"><div class="bar dp" style="width:${dpPct}%"></div></div>
+          <div class="bar-row"><div class="bar bf" style="width:${bfPct}%"></div></div>
+        </td>`;
+      body.appendChild(tr);
+    });
+    document.getElementById('benchTable').style.display = 'table';
+    document.getElementById('benchLegend').style.display = 'flex';
+  });
+
+  // initial render with default pipeline
+  runAnalysis();
+})();
+</script>
+</body>
+</html>
