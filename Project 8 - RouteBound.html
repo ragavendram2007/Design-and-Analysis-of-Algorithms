@@ -1,0 +1,735 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RouteBound — TSP Branch &amp; Bound Visualizer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700;800&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0b0f14;
+    --panel:#111722;
+    --panel2:#161e2b;
+    --line:#243044;
+    --text:#eef2f7;
+    --muted:#8391a5;
+    --amber:#ffa63d;
+    --amber-dim:#8a5c22;
+    --teal:#2dd4bf;
+    --danger:#ef5350;
+    --indigo:#7c8cff;
+    --disp:'Sora', sans-serif;
+    --sans:'Inter', sans-serif;
+    --mono:'IBM Plex Mono', monospace;
+  }
+  @media (prefers-reduced-motion: reduce){ *{animation-duration:0.001ms !important; transition-duration:0.001ms !important;} }
+  *{box-sizing:border-box;}
+  html,body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);}
+  body{
+    background-image:
+      radial-gradient(circle at 8% -10%, rgba(255,166,61,0.07), transparent 45%),
+      radial-gradient(circle at 100% 0%, rgba(124,140,255,0.06), transparent 42%);
+    padding-bottom:70px;
+  }
+  .wrap{max-width:1180px;margin:0 auto;padding:0 24px;}
+  a{color:var(--amber);}
+
+  header.hero{padding:56px 0 30px;border-bottom:1px solid var(--line);}
+  .eyebrow{font-family:var(--mono);font-size:11.5px;color:var(--indigo);letter-spacing:0.16em;text-transform:uppercase;margin:0 0 16px;}
+  h1{font-family:var(--disp);font-weight:800;font-size:clamp(28px,4.4vw,48px);line-height:1.1;margin:0 0 18px;letter-spacing:-0.01em;}
+  h1 span{color:var(--amber);}
+  .lede{font-size:16px;line-height:1.65;color:var(--muted);max-width:680px;margin:0;}
+  .lede b{color:var(--text);font-weight:600;}
+
+  section.panel{
+    background:linear-gradient(180deg,var(--panel),var(--panel2));
+    border:1px solid var(--line);border-radius:12px;padding:26px;margin-top:24px;
+  }
+  .panel h2{font-family:var(--disp);font-size:21px;font-weight:700;margin:0 0 6px;}
+  .panel p.desc{color:var(--muted);font-size:13.5px;line-height:1.55;margin:0 0 20px;}
+
+  /* ---------- setup: matrix + map ---------- */
+  .setup-grid{display:flex;gap:28px;flex-wrap:wrap;align-items:flex-start;}
+  .matrix-col{flex:1 1 320px;min-width:280px;}
+  .map-col{flex:0 0 auto;}
+
+  .n-stepper{display:flex;align-items:center;gap:10px;}
+  .n-stepper button{width:30px;height:30px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--text);font-size:16px;cursor:pointer;}
+  .n-stepper button:hover{border-color:var(--amber);}
+  .n-stepper .n-val{font-family:var(--mono);font-size:16px;min-width:20px;text-align:center;}
+
+  .setup-controls{display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin-bottom:16px;}
+  label.mini{font-family:var(--mono);font-size:10.5px;color:var(--muted);letter-spacing:0.07em;text-transform:uppercase;display:block;margin-bottom:6px;}
+
+  table.cost-matrix{border-collapse:collapse;font-family:var(--mono);font-size:12px;}
+  table.cost-matrix th{color:var(--indigo);padding:4px 6px;font-weight:700;}
+  table.cost-matrix td{padding:2px;}
+  table.cost-matrix input{
+    width:44px;background:var(--bg);border:1px solid var(--line);color:var(--text);
+    font-family:var(--mono);font-size:12px;padding:5px 4px;border-radius:5px;text-align:center;
+  }
+  table.cost-matrix input:focus{outline:2px solid var(--amber);outline-offset:1px;}
+  table.cost-matrix .inf{width:44px;height:28px;display:flex;align-items:center;justify-content:center;color:var(--muted);}
+
+  .map-shell{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px;}
+  .map-shell svg{display:block;}
+  .city-dot{fill:var(--panel2);stroke:var(--indigo);stroke-width:2;}
+  .city-label{fill:var(--text);font-family:var(--mono);font-size:12px;font-weight:600;}
+  .tour-best{fill:none;stroke:var(--teal);stroke-width:2.5;}
+  .tour-current{fill:none;stroke:var(--amber);stroke-width:1.6;stroke-dasharray:4 4;opacity:0.85;}
+
+  .btn{font-family:var(--mono);font-size:12.5px;font-weight:700;letter-spacing:0.02em;background:var(--amber);color:#1a1100;border:none;border-radius:7px;padding:10px 16px;cursor:pointer;transition:box-shadow .12s ease, transform .12s ease;}
+  .btn:hover{box-shadow:0 0 0 3px rgba(255,166,61,0.22);}
+  .btn:active{transform:translateY(1px);}
+  .btn.secondary{background:transparent;border:1px solid var(--teal);color:var(--teal);}
+  .btn.secondary:hover{box-shadow:0 0 0 3px rgba(45,212,191,0.18);}
+  .btn.ghost{background:transparent;border:1px solid var(--line);color:var(--muted);}
+  .btn.ghost:hover{border-color:var(--muted);color:var(--text);}
+  .btn:disabled{opacity:0.4;cursor:not-allowed;}
+  .btn:focus-visible, .n-stepper button:focus-visible, input:focus-visible{outline:2px solid var(--amber);outline-offset:2px;}
+  .btn-row{display:flex;gap:10px;flex-wrap:wrap;}
+
+  /* ---------- search visualizer ---------- */
+  .controls{display:flex;flex-wrap:wrap;gap:22px;align-items:flex-end;margin-bottom:22px;}
+  .ctrl-group{display:flex;flex-direction:column;gap:6px;}
+  .ctrl-group label{font-family:var(--mono);font-size:10.5px;color:var(--muted);letter-spacing:0.08em;text-transform:uppercase;}
+  input[type=range]{width:150px;accent-color:var(--amber);}
+
+  .stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:20px;}
+  .stat{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:12px 14px;}
+  .stat .k{font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:0.06em;text-transform:uppercase;margin-bottom:6px;}
+  .stat .v{font-family:var(--mono);font-size:19px;font-weight:700;color:var(--amber);word-break:break-word;}
+  .stat .v.teal{color:var(--teal);}
+  .stat .v.small{font-size:13px;font-weight:500;color:var(--text);}
+
+  .viz-grid{display:flex;gap:20px;flex-wrap:wrap;align-items:flex-start;}
+  .viz-map, .viz-queue, .viz-log{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px;}
+  .viz-map{flex:0 0 auto;}
+  .viz-queue{flex:1 1 220px;min-width:220px;max-height:340px;overflow-y:auto;}
+  .viz-log{flex:1 1 260px;min-width:260px;max-height:340px;overflow-y:auto;}
+  .viz-title{font-family:var(--mono);font-size:10.5px;color:var(--muted);letter-spacing:0.07em;text-transform:uppercase;margin:0 0 10px;}
+
+  .qrow{display:flex;align-items:center;gap:8px;margin-bottom:6px;font-family:var(--mono);font-size:11px;}
+  .qrow .label{width:70px;flex-shrink:0;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .qrow .bar-track{flex:1;background:var(--panel2);border-radius:3px;height:10px;overflow:hidden;}
+  .qrow .bar-fill{height:100%;background:var(--indigo);border-radius:3px;}
+  .qrow .bound{width:36px;text-align:right;color:var(--muted);}
+  .qempty{color:var(--muted);font-size:11.5px;font-family:var(--mono);}
+
+  .log-entry{font-family:var(--mono);font-size:11px;padding:4px 0 4px 8px;border-left:2px solid var(--line);margin-bottom:3px;line-height:1.5;}
+  .log-entry.expand{border-color:var(--amber);color:var(--text);}
+  .log-entry.push{border-color:var(--indigo);color:var(--muted);}
+  .log-entry.prune{border-color:var(--danger);color:var(--danger);opacity:0.85;}
+  .log-entry.solution{border-color:var(--teal);color:var(--teal);}
+  .log-entry.solution.better{font-weight:700;}
+  .log-entry.done{border-color:var(--text);color:var(--text);font-weight:700;}
+
+  .legend{display:flex;flex-wrap:wrap;gap:14px;margin-top:16px;font-family:var(--mono);font-size:11px;color:var(--muted);}
+  .legend span{display:flex;align-items:center;gap:6px;}
+  .legend .sw{width:11px;height:11px;border-radius:3px;display:inline-block;}
+
+  /* ---------- verify + benchmark ---------- */
+  .verify-line{display:flex;align-items:center;gap:10px;font-family:var(--mono);font-size:13px;flex-wrap:wrap;}
+  .badge{padding:3px 10px;border-radius:999px;font-size:11px;letter-spacing:0.04em;font-weight:700;}
+  .badge.ok{background:rgba(45,212,191,0.15);color:var(--teal);border:1px solid rgba(45,212,191,0.4);}
+  .badge.bad{background:rgba(239,83,80,0.15);color:var(--danger);border:1px solid rgba(239,83,80,0.4);}
+  .badge.pending{background:rgba(131,145,165,0.15);color:var(--muted);border:1px solid var(--line);}
+
+  table.bench{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:12.5px;margin-top:16px;}
+  table.bench th, table.bench td{padding:9px 10px;border-bottom:1px solid var(--line);text-align:right;}
+  table.bench th:first-child, table.bench td:first-child{text-align:left;}
+  table.bench th{color:var(--muted);font-weight:500;font-size:10.5px;letter-spacing:0.05em;text-transform:uppercase;}
+  .bar-row{display:flex;flex-direction:column;gap:3px;}
+  .bar{height:7px;border-radius:2px;}
+  .bar.bnb{background:var(--amber);}
+  .bar.perm{background:var(--indigo);}
+
+  footer{margin-top:44px;padding-top:20px;border-top:1px solid var(--line);font-family:var(--mono);font-size:11px;color:var(--muted);text-align:center;}
+  ::-webkit-scrollbar{height:8px;width:8px;}
+  ::-webkit-scrollbar-track{background:var(--bg);}
+  ::-webkit-scrollbar-thumb{background:var(--line);border-radius:4px;}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header class="hero">
+    <p class="eyebrow">Exercise 8 — Branch &amp; Bound</p>
+    <h1>Every route is a lower bound<br>waiting to be <span>beaten</span>.</h1>
+    <p class="lede">Branch and Bound never checks all (n−1)! tours. It keeps a queue of partial
+      routes sorted by their <b>cheapest possible completion</b>, always expands the most promising
+      one first, and throws away any branch whose bound is already worse than the best full tour found
+      so far. Watch that queue, and the pruning, happen live below.</p>
+  </header>
+
+  <!-- ============ SETUP ============ -->
+  <section class="panel">
+    <h2>Set up the cities</h2>
+    <p class="desc">Edit the cost matrix directly, randomize it, or reset to the exact 5-city example
+      from the lab (A–E). Positions on the map are for display only — the numbers in the matrix are
+      what the algorithm actually uses.</p>
+
+    <div class="setup-controls">
+      <div>
+        <span class="mini">Cities (N)</span>
+        <div class="n-stepper">
+          <button id="nDown" aria-label="Fewer cities">−</button>
+          <span class="n-val" id="nVal">5</span>
+          <button id="nUp" aria-label="More cities">+</button>
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="btn secondary" id="randomizeBtn">Randomize costs</button>
+        <button class="btn ghost" id="resetExampleBtn">Reset to lab example (A–E)</button>
+      </div>
+    </div>
+
+    <div class="setup-grid">
+      <div class="matrix-col">
+        <span class="mini">Cost matrix</span>
+        <div id="matrixHolder"></div>
+      </div>
+      <div class="map-col">
+        <span class="mini">City map (best tour in teal)</span>
+        <div class="map-shell">
+          <svg id="mapSvg" width="300" height="300" viewBox="0 0 300 300"></svg>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ SEARCH VISUALIZER ============ -->
+  <section class="panel">
+    <h2>Watch the search prune itself</h2>
+    <p class="desc">Play or step through the algorithm. The queue on the left always pops its lowest
+      bound first (that's the "branch" choice); anything with a bound at or above the current best
+      tour gets pruned in red instead of expanded.</p>
+
+    <div class="controls">
+      <div class="ctrl-group">
+        <label for="speed">Speed</label>
+        <input type="range" id="speed" min="1" max="10" value="6">
+      </div>
+      <div class="ctrl-group">
+        <label>&nbsp;</label>
+        <div class="btn-row">
+          <button class="btn" id="playBtn">▶ Play</button>
+          <button class="btn secondary" id="stepBtn">Step</button>
+          <button class="btn ghost" id="skipBtn">Skip to end</button>
+          <button class="btn ghost" id="resetBtn">Reset search</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="stat-grid">
+      <div class="stat"><div class="k">Nodes expanded</div><div class="v" id="statExpanded">0</div></div>
+      <div class="stat"><div class="k">Nodes pruned</div><div class="v" id="statPruned">0</div></div>
+      <div class="stat"><div class="k">Best cost so far</div><div class="v teal" id="statBest">∞</div></div>
+      <div class="stat"><div class="k">Best tour so far</div><div class="v small" id="statBestPath">–</div></div>
+    </div>
+
+    <div class="viz-grid">
+      <div class="viz-map">
+        <p class="viz-title">Current partial route</p>
+        <svg id="mapSvg2" width="260" height="260" viewBox="0 0 260 260"></svg>
+      </div>
+      <div class="viz-queue">
+        <p class="viz-title">Frontier queue (sorted by bound)</p>
+        <div id="queueList"><div class="qempty">Queue empty — press Play or Step.</div></div>
+      </div>
+      <div class="viz-log">
+        <p class="viz-title">Search log</p>
+        <div id="searchLog"></div>
+      </div>
+    </div>
+
+    <div class="legend">
+      <span><span class="sw" style="background:var(--amber);"></span>Expanded</span>
+      <span><span class="sw" style="background:var(--indigo);"></span>Pushed to queue</span>
+      <span><span class="sw" style="background:var(--danger);"></span>Pruned</span>
+      <span><span class="sw" style="background:var(--teal);"></span>Complete tour found</span>
+    </div>
+  </section>
+
+  <!-- ============ VERIFY ============ -->
+  <section class="panel">
+    <h2>Verify against brute force</h2>
+    <p class="desc">Runs both the Branch &amp; Bound search and a true brute-force enumeration of every
+      Hamiltonian cycle (fixed at the start city) on the current matrix, instantly, with no animation.</p>
+    <div class="btn-row">
+      <button class="btn" id="verifyBtn">Verify optimal tour</button>
+    </div>
+    <div class="verify-line" style="margin-top:16px;">
+      <span>Result:</span>
+      <span class="badge pending" id="verifyBadge">NOT RUN</span>
+      <span id="verifyDetail" style="color:var(--muted);"></span>
+    </div>
+  </section>
+
+  <!-- ============ BENCHMARK ============ -->
+  <section class="panel">
+    <h2>Why pruning matters</h2>
+    <p class="desc">As N grows, brute force checks every one of (N−1)! possible tours. Branch and
+      Bound only expands the nodes that could still beat the best tour found. Same random-seeded cost
+      matrices, computed instantly in your browser.</p>
+    <div class="btn-row">
+      <button class="btn" id="benchBtn">Run for N = 4…9</button>
+    </div>
+    <table class="bench" id="benchTable" style="display:none;">
+      <thead><tr><th>N</th><th>Optimal cost</th><th>B&amp;B nodes expanded</th><th>Brute-force permutations</th><th>Relative</th></tr></thead>
+      <tbody id="benchBody"></tbody>
+    </table>
+  </section>
+
+  <footer>
+    RouteBound — TSP Branch &amp; Bound visualizer, built from the Ex.8 lab reference algorithm
+    (matrix-reduction lower bound, priority-queue best-first search). All computation runs client-side.
+  </footer>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  const INF = Infinity;
+
+  // ================= Core: matrix reduction =================
+  function reduceMatrix(matrix, n){
+    let m = matrix.map(r => r.slice());
+    let total = 0;
+    for(let i=0;i<n;i++){
+      let rowMin = INF;
+      for(let j=0;j<n;j++) if(m[i][j] < rowMin) rowMin = m[i][j];
+      if(rowMin === INF) rowMin = 0;
+      if(rowMin > 0){ total += rowMin; for(let j=0;j<n;j++) if(m[i][j] !== INF) m[i][j] -= rowMin; }
+    }
+    for(let j=0;j<n;j++){
+      let colMin = INF;
+      for(let i=0;i<n;i++) if(m[i][j] < colMin) colMin = m[i][j];
+      if(colMin === INF) colMin = 0;
+      if(colMin > 0){ total += colMin; for(let i=0;i<n;i++) if(m[i][j] !== INF) m[i][j] -= colMin; }
+    }
+    return {matrix:m, cost:total};
+  }
+
+  // ================= Generator: animated Branch & Bound =================
+  function* solveBnBGen(costMatrix, n){
+    const {matrix:m0, cost:rc0} = reduceMatrix(costMatrix, n);
+    let nodeId = 0;
+    let frontier = [{id:nodeId++, path:[0], matrix:m0, bound:rc0, realCost:0}];
+    let best = {cost: INF, path: null};
+    let expanded = 0, pruned = 0;
+
+    while(frontier.length){
+      frontier.sort((a,b) => a.bound - b.bound);
+      const node = frontier.shift();
+      if(node.bound >= best.cost){
+        pruned++;
+        yield {type:'prune', node, bestCost: best.cost, expanded, pruned};
+        continue;
+      }
+      expanded++;
+      yield {type:'expand', node, expanded, pruned};
+      if(node.path.length === n){
+        const last = node.path[node.path.length-1];
+        const tourCost = node.realCost + costMatrix[last][0];
+        const improved = tourCost < best.cost;
+        if(improved) best = {cost: tourCost, path: node.path.concat([0])};
+        yield {type:'solution', node, tourCost, improved, best, expanded, pruned};
+        continue;
+      }
+      const u = node.path[node.path.length-1];
+      for(let v=0; v<n; v++){
+        if(node.path.includes(v)) continue;
+        const edgeCost = node.matrix[u][v];
+        if(edgeCost === INF) continue;
+        let childMatrix = node.matrix.map(r => r.slice());
+        for(let k=0;k<n;k++){ childMatrix[u][k]=INF; childMatrix[k][v]=INF; }
+        childMatrix[v][0] = INF;
+        const {matrix:reducedChild, cost:reductionCost} = reduceMatrix(childMatrix, n);
+        const bound = node.bound + edgeCost + reductionCost;
+        const child = {id:nodeId++, path:node.path.concat([v]), matrix:reducedChild, bound, realCost:node.realCost + costMatrix[u][v]};
+        if(bound < best.cost){
+          frontier.push(child);
+          yield {type:'push', node: child, expanded, pruned};
+        } else {
+          pruned++;
+          yield {type:'prune_early', node: child, bestCost: best.cost, expanded, pruned};
+        }
+      }
+    }
+    yield {type:'done', best, expanded, pruned};
+  }
+
+  // ================= Fast (non-animated) versions =================
+  function solveBnBFast(costMatrix, n){
+    const {matrix:m0, cost:rc0} = reduceMatrix(costMatrix, n);
+    let frontier = [{path:[0], matrix:m0, bound:rc0, realCost:0}];
+    let best = {cost: INF, path: null};
+    let expanded = 0, pruned = 0;
+    while(frontier.length){
+      frontier.sort((a,b) => a.bound - b.bound);
+      const node = frontier.shift();
+      if(node.bound >= best.cost){ pruned++; continue; }
+      expanded++;
+      if(node.path.length === n){
+        const last = node.path[node.path.length-1];
+        const tourCost = node.realCost + costMatrix[last][0];
+        if(tourCost < best.cost) best = {cost: tourCost, path: node.path.concat([0])};
+        continue;
+      }
+      const u = node.path[node.path.length-1];
+      for(let v=0; v<n; v++){
+        if(node.path.includes(v)) continue;
+        const edgeCost = node.matrix[u][v];
+        if(edgeCost === INF) continue;
+        let childMatrix = node.matrix.map(r => r.slice());
+        for(let k=0;k<n;k++){ childMatrix[u][k]=INF; childMatrix[k][v]=INF; }
+        childMatrix[v][0] = INF;
+        const {matrix:reducedChild, cost:reductionCost} = reduceMatrix(childMatrix, n);
+        const bound = node.bound + edgeCost + reductionCost;
+        const child = {path:node.path.concat([v]), matrix:reducedChild, bound, realCost:node.realCost + costMatrix[u][v]};
+        if(bound < best.cost) frontier.push(child); else pruned++;
+      }
+    }
+    return {best, expanded, pruned};
+  }
+
+  function bruteForceTSP(costMatrix, n){
+    const cities = [];
+    for(let i=1;i<n;i++) cities.push(i);
+    let best = INF, bestPath = null, count = 0;
+    function permute(arr, l){
+      if(l === arr.length){
+        count++;
+        const path = [0, ...arr, 0];
+        let c = 0;
+        for(let i=0;i<path.length-1;i++) c += costMatrix[path[i]][path[i+1]];
+        if(c < best){ best = c; bestPath = path; }
+        return;
+      }
+      for(let i=l;i<arr.length;i++){
+        [arr[l],arr[i]] = [arr[i],arr[l]];
+        permute(arr, l+1);
+        [arr[l],arr[i]] = [arr[i],arr[l]];
+      }
+    }
+    permute(cities, 0);
+    return {best, bestPath, count};
+  }
+
+  // seeded PRNG
+  function mulberry32(seed){
+    return function(){
+      seed |= 0; seed = (seed + 0x6D2B79F5) | 0;
+      let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  function randomCostMatrix(n, seed){
+    const rand = mulberry32(seed);
+    const m = Array.from({length:n}, () => new Array(n).fill(0));
+    for(let i=0;i<n;i++){
+      for(let j=i+1;j<n;j++){
+        const v = 3 + Math.floor(rand()*13);
+        m[i][j] = v; m[j][i] = v;
+      }
+      m[i][i] = INF;
+    }
+    return m;
+  }
+  function factorial(k){ let r=1; for(let i=2;i<=k;i++) r*=i; return r; }
+
+  // ================= UI state =================
+  const MIN_N = 4, MAX_N = 8;
+  let n = 5;
+  let cities = ['A','B','C','D','E'];
+  let costMatrix = [
+    [INF,10,8,9,7],
+    [10,INF,10,5,6],
+    [8,10,INF,8,9],
+    [9,5,8,INF,6],
+    [7,6,9,6,INF]
+  ];
+
+  let gen = null, playing = false, timer = null, finished = false;
+  let uiFrontier = [];
+  let stats = {expanded:0, pruned:0};
+  let bestSoFar = {cost: INF, path: null};
+
+  const nValEl = document.getElementById('nVal');
+  const matrixHolder = document.getElementById('matrixHolder');
+  const mapSvg = document.getElementById('mapSvg');
+  const mapSvg2 = document.getElementById('mapSvg2');
+  const speedInput = document.getElementById('speed');
+  const playBtn = document.getElementById('playBtn');
+  const stepBtn = document.getElementById('stepBtn');
+  const skipBtn = document.getElementById('skipBtn');
+  const resetBtn = document.getElementById('resetBtn');
+  const statExpanded = document.getElementById('statExpanded');
+  const statPruned = document.getElementById('statPruned');
+  const statBest = document.getElementById('statBest');
+  const statBestPath = document.getElementById('statBestPath');
+  const queueList = document.getElementById('queueList');
+  const searchLog = document.getElementById('searchLog');
+
+  function speedMs(){ const v = Number(speedInput.value); return Math.round(560 - v*50); }
+
+  // ---------- matrix editor ----------
+  function renderMatrixEditor(){
+    let html = '<table class="cost-matrix"><tr><th></th>';
+    cities.forEach(c => html += `<th>${c}</th>`);
+    html += '</tr>';
+    for(let i=0;i<n;i++){
+      html += `<tr><th>${cities[i]}</th>`;
+      for(let j=0;j<n;j++){
+        if(i===j){
+          html += `<td><div class="inf">∞</div></td>`;
+        } else {
+          html += `<td><input type="number" min="1" max="999" data-i="${i}" data-j="${j}" value="${costMatrix[i][j]}"></td>`;
+        }
+      }
+      html += '</tr>';
+    }
+    html += '</table>';
+    matrixHolder.innerHTML = html;
+    matrixHolder.querySelectorAll('input').forEach(inp => {
+      inp.addEventListener('change', () => {
+        const i = Number(inp.dataset.i), j = Number(inp.dataset.j);
+        let v = Number(inp.value);
+        if(!Number.isFinite(v) || v <= 0) v = 1;
+        costMatrix[i][j] = v; costMatrix[j][i] = v;
+        inp.value = v;
+        drawMap(mapSvg, null, null);
+        drawMap(mapSvg2, null, null);
+        resetSearch();
+      });
+    });
+  }
+
+  // ---------- city map ----------
+  function cityPositions(size){
+    const cx = size/2, cy = size/2, r = size*0.38;
+    const pos = [];
+    for(let i=0;i<n;i++){
+      const angle = (i * 2*Math.PI/n) - Math.PI/2;
+      pos.push({x: cx + r*Math.cos(angle), y: cy + r*Math.sin(angle)});
+    }
+    return pos;
+  }
+
+  function drawMap(svgEl, currentPath, bestPath){
+    const size = Number(svgEl.getAttribute('width'));
+    const pos = cityPositions(size);
+    let inner = '';
+    if(bestPath && bestPath.length){
+      inner += `<polyline class="tour-best" points="${bestPath.map(i => `${pos[i].x},${pos[i].y}`).join(' ')}" />`;
+    }
+    if(currentPath && currentPath.length > 1){
+      inner += `<polyline class="tour-current" points="${currentPath.map(i => `${pos[i].x},${pos[i].y}`).join(' ')}" />`;
+    }
+    pos.forEach((p, i) => {
+      inner += `<circle class="city-dot" cx="${p.x}" cy="${p.y}" r="11"></circle>`;
+      inner += `<text class="city-label" x="${p.x}" y="${p.y+4}" text-anchor="middle">${cities[i]}</text>`;
+    });
+    svgEl.innerHTML = inner;
+  }
+
+  // ---------- log ----------
+  function pathLabel(path){ return path.map(i => cities[i]).join('→'); }
+
+  function addLog(cls, text){
+    const div = document.createElement('div');
+    div.className = 'log-entry ' + cls;
+    div.textContent = text;
+    searchLog.appendChild(div);
+    searchLog.scrollTop = searchLog.scrollHeight;
+  }
+
+  function renderQueue(){
+    if(uiFrontier.length === 0){
+      queueList.innerHTML = '<div class="qempty">Queue empty.</div>';
+      return;
+    }
+    const sorted = uiFrontier.slice().sort((a,b) => a.bound - b.bound);
+    const maxBound = Math.max(...sorted.map(x => x.bound), 1);
+    queueList.innerHTML = sorted.map(node => {
+      const pct = Math.max(4, (node.bound / maxBound) * 100);
+      return `<div class="qrow">
+        <div class="label">${pathLabel(node.path)}</div>
+        <div class="bar-track"><div class="bar-fill" style="width:${pct}%"></div></div>
+        <div class="bound">${node.bound}</div>
+      </div>`;
+    }).join('');
+  }
+
+  function updateStatsUI(){
+    statExpanded.textContent = stats.expanded;
+    statPruned.textContent = stats.pruned;
+    statBest.textContent = bestSoFar.cost === INF ? '∞' : bestSoFar.cost;
+    statBestPath.textContent = bestSoFar.path ? pathLabel(bestSoFar.path) : '–';
+  }
+
+  function handleEvent(ev){
+    if(ev.type === 'expand'){
+      stats.expanded = ev.expanded; stats.pruned = ev.pruned;
+      uiFrontier = uiFrontier.filter(x => x.id !== ev.node.id);
+      drawMap(mapSvg2, ev.node.path, bestSoFar.path);
+      addLog('expand', `expand  ${pathLabel(ev.node.path)}   bound=${ev.node.bound}`);
+    } else if(ev.type === 'push'){
+      stats.expanded = ev.expanded; stats.pruned = ev.pruned;
+      uiFrontier.push(ev.node);
+      addLog('push', `push    ${pathLabel(ev.node.path)}   bound=${ev.node.bound}`);
+    } else if(ev.type === 'prune'){
+      stats.expanded = ev.expanded; stats.pruned = ev.pruned;
+      uiFrontier = uiFrontier.filter(x => x.id !== ev.node.id);
+      addLog('prune', `prune   ${pathLabel(ev.node.path)}   bound=${ev.node.bound} ≥ best ${ev.bestCost}`);
+    } else if(ev.type === 'prune_early'){
+      stats.expanded = ev.expanded; stats.pruned = ev.pruned;
+      addLog('prune', `prune   ${pathLabel(ev.node.path)}   bound=${ev.node.bound} ≥ best ${ev.bestCost} (never queued)`);
+    } else if(ev.type === 'solution'){
+      stats.expanded = ev.expanded; stats.pruned = ev.pruned;
+      if(ev.improved){
+        bestSoFar = ev.best;
+        drawMap(mapSvg, null, bestSoFar.path);
+        drawMap(mapSvg2, ev.node.path, bestSoFar.path);
+      }
+      addLog('solution' + (ev.improved ? ' better' : ''),
+        `tour    ${pathLabel(ev.node.path.concat([ev.node.path[0]]))}   cost=${ev.tourCost}` + (ev.improved ? '  ← new best' : ''));
+    } else if(ev.type === 'done'){
+      finished = true;
+      stats.expanded = ev.expanded; stats.pruned = ev.pruned;
+      bestSoFar = ev.best;
+      drawMap(mapSvg, null, bestSoFar.path);
+      addLog('done', `done — optimal cost ${ev.best.cost}, tour ${pathLabel(ev.best.path)}, ${ev.expanded} expanded / ${ev.pruned} pruned`);
+      stopPlayback();
+    }
+    updateStatsUI();
+    renderQueue();
+  }
+
+  function stepOnce(){
+    if(finished) return;
+    if(!gen) gen = solveBnBGen(costMatrix, n);
+    const {value, done} = gen.next();
+    if(done) return;
+    handleEvent(value);
+  }
+
+  function stopPlayback(){
+    playing = false; clearInterval(timer); timer = null; playBtn.textContent = '▶ Play';
+  }
+  function pause(){ if(playing) stopPlayback(); }
+  function play(){
+    if(finished) return;
+    playing = true; playBtn.textContent = '⏸ Pause';
+    clearInterval(timer);
+    timer = setInterval(stepOnce, speedMs());
+  }
+
+  function resetSearch(){
+    stopPlayback();
+    gen = null; finished = false;
+    uiFrontier = [];
+    stats = {expanded:0, pruned:0};
+    bestSoFar = {cost: INF, path: null};
+    searchLog.innerHTML = '';
+    queueList.innerHTML = '<div class="qempty">Queue empty — press Play or Step.</div>';
+    updateStatsUI();
+    drawMap(mapSvg, null, null);
+    drawMap(mapSvg2, null, null);
+    document.getElementById('verifyBadge').className = 'badge pending';
+    document.getElementById('verifyBadge').textContent = 'NOT RUN';
+    document.getElementById('verifyDetail').textContent = '';
+  }
+
+  function skipToEnd(){
+    pause();
+    let guard = 0;
+    while(!finished && guard < 2_000_000){ stepOnce(); guard++; }
+  }
+
+  function rebuildForN(){
+    renderMatrixEditor();
+    resetSearch();
+  }
+
+  // ---------- wiring ----------
+  document.getElementById('nDown').addEventListener('click', () => {
+    if(n > MIN_N){
+      n--; cities = cities.slice(0, n);
+      costMatrix = randomCostMatrix(n, n*131+7);
+      nValEl.textContent = n; rebuildForN();
+    }
+  });
+  document.getElementById('nUp').addEventListener('click', () => {
+    if(n < MAX_N){
+      n++;
+      cities = 'ABCDEFGH'.slice(0, n).split('');
+      costMatrix = randomCostMatrix(n, n*131+7);
+      nValEl.textContent = n; rebuildForN();
+    }
+  });
+  document.getElementById('randomizeBtn').addEventListener('click', () => {
+    costMatrix = randomCostMatrix(n, Date.now() % 100000);
+    rebuildForN();
+  });
+  document.getElementById('resetExampleBtn').addEventListener('click', () => {
+    n = 5; cities = ['A','B','C','D','E'];
+    costMatrix = [
+      [INF,10,8,9,7],[10,INF,10,5,6],[8,10,INF,8,9],[9,5,8,INF,6],[7,6,9,6,INF]
+    ];
+    nValEl.textContent = n; rebuildForN();
+  });
+
+  playBtn.addEventListener('click', () => { playing ? pause() : play(); });
+  stepBtn.addEventListener('click', () => { pause(); stepOnce(); });
+  skipBtn.addEventListener('click', skipToEnd);
+  resetBtn.addEventListener('click', resetSearch);
+  speedInput.addEventListener('input', () => { if(playing){ clearInterval(timer); timer = setInterval(stepOnce, speedMs()); } });
+
+  document.getElementById('verifyBtn').addEventListener('click', () => {
+    const bnb = solveBnBFast(costMatrix, n);
+    const bf = bruteForceTSP(costMatrix, n);
+    const badge = document.getElementById('verifyBadge');
+    const detail = document.getElementById('verifyDetail');
+    if(bnb.best.cost === bf.best){
+      badge.className = 'badge ok'; badge.textContent = 'MATCH';
+    } else {
+      badge.className = 'badge bad'; badge.textContent = 'MISMATCH';
+    }
+    detail.textContent = `Branch & Bound: cost ${bnb.best.cost} (${bnb.expanded} expanded, ${bnb.pruned} pruned) — Brute force: cost ${bf.best} across ${bf.count.toLocaleString()} tours.`;
+  });
+
+  document.getElementById('benchBtn').addEventListener('click', () => {
+    const ns = [4,5,6,7,8,9];
+    const body = document.getElementById('benchBody');
+    body.innerHTML = '';
+    let maxVal = 1;
+    const rows = ns.map(nn => {
+      const cm = randomCostMatrix(nn, nn*977+11);
+      const bnb = solveBnBFast(cm, nn);
+      const perms = factorial(nn-1);
+      maxVal = Math.max(maxVal, bnb.expanded, perms);
+      return {nn, cost: bnb.best.cost, expanded: bnb.expanded, perms};
+    });
+    rows.forEach(r => {
+      const bnbPct = Math.max(1.5, (r.expanded / maxVal) * 100);
+      const permPct = Math.max(1.5, (r.perms / maxVal) * 100);
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${r.nn}</td><td>${r.cost}</td><td>${r.expanded.toLocaleString()}</td><td>${r.perms.toLocaleString()}</td>
+        <td><div class="bar-row"><div class="bar bnb" style="width:${bnbPct}%"></div><div class="bar perm" style="width:${permPct}%"></div></div></td>`;
+      body.appendChild(tr);
+    });
+    document.getElementById('benchTable').style.display = 'table';
+  });
+
+  // ---------- init ----------
+  nValEl.textContent = n;
+  renderMatrixEditor();
+  resetSearch();
+})();
+</script>
+</body>
+</html>
